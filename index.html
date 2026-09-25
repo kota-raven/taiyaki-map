@@ -235,15 +235,24 @@ $("import").onclick = () => $("file").click();
 $("file").onchange = async e => { try { const d = JSON.parse(await e.target.files[0].text()); if (Array.isArray(d)) { shops = d; persist(); render(); } } catch { alert("読み込めないファイルです"); } };
 
 // ===== 場所の検索(国土地理院の住所検索。キー不要) =====
-async function geocode(q) {
-  try {   // 駅名・施設名に強い Nominatim を先に試す
-    const n = await (await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=jp&accept-language=ja&q=" + encodeURIComponent(q))).json();
-    if (n.length) { const parts = n[0].display_name.split(","); return { lat:+n[0].lat, lng:+n[0].lon, name:parts.slice(0, 2).join(" "), short:n[0].name || parts[0] }; }
-  } catch {}
+async function geoNominatim(q) {   // 駅名・施設名に強い
+  const n = await (await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=jp&accept-language=ja&q=" + encodeURIComponent(q))).json();
+  if (!n.length) return null;
+  const parts = n[0].display_name.split(",");
+  return { lat:+n[0].lat, lng:+n[0].lon, name:parts.slice(0, 2).join(" "), short:n[0].name || parts[0] };
+}
+async function geoGsi(q) {          // 番地までの住所に強い
   const r = await (await fetch("https://msearch.gsi.go.jp/address-search/AddressSearch?q=" + encodeURIComponent(q))).json();
   if (!r.length) return null;
   const [lng, lat] = r[0].geometry.coordinates;
   return { lat, lng, name: r[0].properties.title, short: "" };
+}
+async function geocode(q) {
+  // 全角の数字・ハイフンを半角にそろえる
+  q = q.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[－−‐―]/g, "-").trim();
+  const order = /\d/.test(q) ? [geoGsi, geoNominatim] : [geoNominatim, geoGsi];   // 番号入り=住所とみなす
+  for (const f of order) { try { const g = await f(q); if (g) return g; } catch {} }
+  return null;
 }
 $("placebtn").onclick = async () => {
   const q = $("place").value.trim(); if (!q) return;
