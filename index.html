@@ -172,206 +172,8 @@ function popupHtml(s){
 function renderChips(){
   const box = $("chips"); box.innerHTML = "";
   const mk = (label, c, on, fn) => { const b = document.createElement("button"); b.className = "chip" + (on?" on":""); b.style.setProperty("--c", c); b.textContent = label; b.onclick = fn; box.appendChild(b); };
-  mk("すべて", "#333", !activeGenres.size, () => { activeGenres.clear(); // ===== 場所の検索(国土地理院の住所検索。キー不要) =====
-async function geocode(q) {
-  try {   // 駅名・施設名に強い Nominatim を先に試す
-    const n = await (await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=jp&accept-language=ja&q=" + encodeURIComponent(q))).json();
-    if (n.length) return { lat:+n[0].lat, lng:+n[0].lon, name:n[0].display_name.split(",").slice(0, 2).join(" ") };
-  } catch {}
-  const r = await (await fetch("https://msearch.gsi.go.jp/address-search/AddressSearch?q=" + encodeURIComponent(q))).json();
-  if (!r.length) return null;
-  const [lng, lat] = r[0].geometry.coordinates;
-  return { lat, lng, name: r[0].properties.title };
-}
-$("placebtn").onclick = async () => {
-  const q = $("place").value.trim(); if (!q) return;
-  try { const g = await geocode(q); if (!g) return alert("見つかりませんでした"); map.setView([g.lat, g.lng], 16); }
-  catch { alert("検索に失敗しました"); }
-};
-$("place").onkeydown = e => { if (e.key === "Enter") $("placebtn").click(); };
-$("geobtn").onclick = async () => {
-  const q = $("geo").value.trim(); if (!q) return;
-  $("geores").textContent = "検索中…";
-  try {
-    const g = await geocode(q);
-    if (!g) { $("geores").textContent = "見つかりませんでした"; return; }
-    pending = { ...(pending||{}), lat:g.lat, lng:g.lng };
-    if (!$("name").value) $("name").value = g.name;
-    $("geores").textContent = "📍 " + g.name; map.setView([g.lat, g.lng], 16);
-  } catch { $("geores").textContent = "検索に失敗しました。地図をクリックして選んでください"; }
-};
-
-// ===== 現在地を追う =====
-let watchId = null, meMarker = null;
-$("track").onclick = () => {
-  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; $("track").classList.remove("on"); $("track").textContent = "現在地を追う"; return; }
-  if (!navigator.geolocation) return alert("この端末では位置情報が使えません");
-  let first = true;
-  watchId = navigator.geolocation.watchPosition(p => {
-    userPos = { lat:p.coords.latitude, lng:p.coords.longitude };
-    if (!meMarker) meMarker = L.marker(userPos, { icon:L.divIcon({ className:"", html:'<div class="me"></div>', iconSize:[16,16] }), zIndexOffset:1000 }).addTo(map);
-    else meMarker.setLatLng(userPos);
-    if (first) { map.setView(userPos, 15); first = false; }
-    render();
-  }, () => { alert("現在地を取得できませんでした"); $("track").click(); }, { enableHighAccuracy:true });
-  $("track").classList.add("on"); $("track").textContent = "追跡中(停止)";
-};
-$("locate").onclick = () => { if (watchId === null) $("track").click(); else if (userPos) map.setView(userPos, 15); };
-
-// ===== 近い順 =====
-$("near").onclick = () => {
-  if (!userPos) { alert("先に「現在地を追う」を押して、現在地を取得してください"); return; }
-  sortNear = !sortNear; $("near").classList.toggle("on", sortNear); render();
-};
-
-// ===== ルート案内(徒歩・自転車・車) =====
-const MODES = { foot:["徒歩","routed-foot"], bike:["自転車","routed-bike"], car:["車","routed-car"] };
-let routeLine = null, routeShop = null, routeMode = "foot";
-function panel(html) { const p = $("panel"); p.innerHTML = html; p.style.display = html ? "block" : "none"; }
-function clearRoute() { if (routeLine) map.removeLayer(routeLine); routeLine = routeShop = null; panel(""); }
-async function startRoute(s, mode) {
-  routeShop = s; routeMode = mode || routeMode;
-  if (!userPos) {
-    panel("現在地を取得中…");
-    try { await new Promise((ok, ng) => navigator.geolocation.getCurrentPosition(p => { userPos = { lat:p.coords.latitude, lng:p.coords.longitude }; ok(); }, ng, { enableHighAccuracy:true })); }
-    catch { panel(`現在地を取得できませんでした。<br><a target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">Googleマップで経路を見る</a> <button class="sub" onclick="clearRoute()">閉じる</button>`); return; }
-  }
-  const [label, srv] = MODES[routeMode];
-  const url = `https://routing.openstreetmap.de/${srv}/route/v1/driving/${userPos.lng},${userPos.lat};${s.lng},${s.lat}?overview=full&geometries=geojson`;
-  let info;
-  try {
-    const r = (await (await fetch(url)).json()).routes[0];
-    if (routeLine) map.removeLayer(routeLine);
-    routeLine = L.geoJSON(r.geometry, { style:{ color:"#1a73e8", weight:6, opacity:.85 } }).addTo(map);
-    map.fitBounds(routeLine.getBounds(), { padding:[50,50] });
-    info = `${label}:<b>${fmtD(r.distance)}</b>・約<b>${Math.max(1, Math.round(r.duration/60))}分</b>`;
-  } catch {
-    if (routeLine) map.removeLayer(routeLine);
-    routeLine = L.polyline([userPos, s], { color:"#1a73e8", weight:4, dashArray:"8 8" }).addTo(map);
-    map.fitBounds(routeLine.getBounds(), { padding:[50,50] });
-    info = `道順を取得できず直線距離のみ:<b>${fmtD(dist(userPos, s))}</b>`;
-  }
-  const btn = k => `<button class="${k===routeMode?"":"sub"}" onclick="startRoute(routeShop,'${k}')">${MODES[k][0]}</button>`;
-  panel(`<b>${esc(s.name)}</b>まで<br>${info}<div class="modes">${btn("foot")}${btn("bike")}${btn("car")}</div><button class="sub" onclick="clearRoute()">ルートを消す</button>`);
-}
-
-// ===== 距離を測る =====
-let measuring = false, mPts = [], mLine = null, mDots = [];
-function endMeasure() { measuring = false; mPts = []; if (mLine) map.removeLayer(mLine); mDots.forEach(d => map.removeLayer(d)); mLine = null; mDots = []; $("measure").classList.remove("on"); $("measure").textContent = "距離を測る"; panel(""); }
-$("measure").onclick = () => {
-  if (measuring) return endMeasure();
-  measuring = true; picking = false; $("hint").style.display = "none";
-  $("measure").classList.add("on"); $("measure").textContent = "測定を終える";
-  panel("地図をクリックして地点を順に選んでください");
-};
-map.on("click", e => {
-  if (!measuring) return;
-  mPts.push(e.latlng); mDots.push(L.circleMarker(e.latlng, { radius:5, color:"#d9480f" }).addTo(map));
-  if (mLine) map.removeLayer(mLine);
-  mLine = L.polyline(mPts, { color:"#d9480f", weight:4 }).addTo(map);
-  let t = 0; for (let i = 1; i < mPts.length; i++) t += dist(mPts[i-1], mPts[i]);
-  panel(`合計距離:<b>${fmtD(t)}</b>(徒歩で約${Math.max(1, Math.round(t/80))}分)`);
-});
-
-renderChips(); render(); });
-  Object.entries(GENRES).forEach(([g,c]) => mk(g, c, activeGenres.has(g), () => { activeGenres.has(g) ? activeGenres.delete(g) : activeGenres.add(g); // ===== 場所の検索(国土地理院の住所検索。キー不要) =====
-async function geocode(q) {
-  const r = await (await fetch("https://msearch.gsi.go.jp/address-search/AddressSearch?q=" + encodeURIComponent(q))).json();
-  if (!r.length) return null;
-  const [lng, lat] = r[0].geometry.coordinates;
-  return { lat, lng, name: r[0].properties.title };
-}
-$("placebtn").onclick = async () => {
-  const q = $("place").value.trim(); if (!q) return;
-  try { const g = await geocode(q); if (!g) return alert("見つかりませんでした"); map.setView([g.lat, g.lng], 16); }
-  catch { alert("検索に失敗しました"); }
-};
-$("place").onkeydown = e => { if (e.key === "Enter") $("placebtn").click(); };
-$("geobtn").onclick = async () => {
-  const q = $("geo").value.trim(); if (!q) return;
-  $("geores").textContent = "検索中…";
-  try {
-    const g = await geocode(q);
-    if (!g) { $("geores").textContent = "見つかりませんでした"; return; }
-    pending = { ...(pending||{}), lat:g.lat, lng:g.lng };
-    if (!$("name").value) $("name").value = g.name;
-    $("geores").textContent = "📍 " + g.name; map.setView([g.lat, g.lng], 16);
-  } catch { $("geores").textContent = "検索に失敗しました。地図をクリックして選んでください"; }
-};
-
-// ===== 現在地を追う =====
-let watchId = null, meMarker = null;
-$("track").onclick = () => {
-  if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; $("track").classList.remove("on"); $("track").textContent = "現在地を追う"; return; }
-  if (!navigator.geolocation) return alert("この端末では位置情報が使えません");
-  let first = true;
-  watchId = navigator.geolocation.watchPosition(p => {
-    userPos = { lat:p.coords.latitude, lng:p.coords.longitude };
-    if (!meMarker) meMarker = L.marker(userPos, { icon:L.divIcon({ className:"", html:'<div class="me"></div>', iconSize:[16,16] }), zIndexOffset:1000 }).addTo(map);
-    else meMarker.setLatLng(userPos);
-    if (first) { map.setView(userPos, 15); first = false; }
-    render();
-  }, () => { alert("現在地を取得できませんでした"); $("track").click(); }, { enableHighAccuracy:true });
-  $("track").classList.add("on"); $("track").textContent = "追跡中(停止)";
-};
-$("locate").onclick = () => { if (watchId === null) $("track").click(); else if (userPos) map.setView(userPos, 15); };
-
-// ===== 近い順 =====
-$("near").onclick = () => {
-  if (!userPos) { alert("先に「現在地を追う」を押して、現在地を取得してください"); return; }
-  sortNear = !sortNear; $("near").classList.toggle("on", sortNear); render();
-};
-
-// ===== ルート案内(徒歩・自転車・車) =====
-const MODES = { foot:["徒歩","routed-foot"], bike:["自転車","routed-bike"], car:["車","routed-car"] };
-let routeLine = null, routeShop = null, routeMode = "foot";
-function panel(html) { const p = $("panel"); p.innerHTML = html; p.style.display = html ? "block" : "none"; }
-function clearRoute() { if (routeLine) map.removeLayer(routeLine); routeLine = routeShop = null; panel(""); }
-async function startRoute(s, mode) {
-  routeShop = s; routeMode = mode || routeMode;
-  if (!userPos) {
-    panel("現在地を取得中…");
-    try { await new Promise((ok, ng) => navigator.geolocation.getCurrentPosition(p => { userPos = { lat:p.coords.latitude, lng:p.coords.longitude }; ok(); }, ng, { enableHighAccuracy:true })); }
-    catch { panel(`現在地を取得できませんでした。<br><a target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">Googleマップで経路を見る</a> <button class="sub" onclick="clearRoute()">閉じる</button>`); return; }
-  }
-  const [label, srv] = MODES[routeMode];
-  const url = `https://routing.openstreetmap.de/${srv}/route/v1/driving/${userPos.lng},${userPos.lat};${s.lng},${s.lat}?overview=full&geometries=geojson`;
-  let info;
-  try {
-    const r = (await (await fetch(url)).json()).routes[0];
-    if (routeLine) map.removeLayer(routeLine);
-    routeLine = L.geoJSON(r.geometry, { style:{ color:"#1a73e8", weight:6, opacity:.85 } }).addTo(map);
-    map.fitBounds(routeLine.getBounds(), { padding:[50,50] });
-    info = `${label}:<b>${fmtD(r.distance)}</b>・約<b>${Math.max(1, Math.round(r.duration/60))}分</b>`;
-  } catch {
-    if (routeLine) map.removeLayer(routeLine);
-    routeLine = L.polyline([userPos, s], { color:"#1a73e8", weight:4, dashArray:"8 8" }).addTo(map);
-    map.fitBounds(routeLine.getBounds(), { padding:[50,50] });
-    info = `道順を取得できず直線距離のみ:<b>${fmtD(dist(userPos, s))}</b>`;
-  }
-  const btn = k => `<button class="${k===routeMode?"":"sub"}" onclick="startRoute(routeShop,'${k}')">${MODES[k][0]}</button>`;
-  panel(`<b>${esc(s.name)}</b>まで<br>${info}<div class="modes">${btn("foot")}${btn("bike")}${btn("car")}</div><button class="sub" onclick="clearRoute()">ルートを消す</button>`);
-}
-
-// ===== 距離を測る =====
-let measuring = false, mPts = [], mLine = null, mDots = [];
-function endMeasure() { measuring = false; mPts = []; if (mLine) map.removeLayer(mLine); mDots.forEach(d => map.removeLayer(d)); mLine = null; mDots = []; $("measure").classList.remove("on"); $("measure").textContent = "距離を測る"; panel(""); }
-$("measure").onclick = () => {
-  if (measuring) return endMeasure();
-  measuring = true; picking = false; $("hint").style.display = "none";
-  $("measure").classList.add("on"); $("measure").textContent = "測定を終える";
-  panel("地図をクリックして地点を順に選んでください");
-};
-map.on("click", e => {
-  if (!measuring) return;
-  mPts.push(e.latlng); mDots.push(L.circleMarker(e.latlng, { radius:5, color:"#d9480f" }).addTo(map));
-  if (mLine) map.removeLayer(mLine);
-  mLine = L.polyline(mPts, { color:"#d9480f", weight:4 }).addTo(map);
-  let t = 0; for (let i = 1; i < mPts.length; i++) t += dist(mPts[i-1], mPts[i]);
-  panel(`合計距離:<b>${fmtD(t)}</b>(徒歩で約${Math.max(1, Math.round(t/80))}分)`);
-});
-
-renderChips(); render(); }));
+  mk("すべて", "#333", !activeGenres.size, () => { activeGenres.clear(); renderChips(); render(); });
+  Object.entries(GENRES).forEach(([g,c]) => mk(g, c, activeGenres.has(g), () => { activeGenres.has(g) ? activeGenres.delete(g) : activeGenres.add(g); renderChips(); render(); }));
 }
 
 // ---- 追加/編集ダイアログ ----
@@ -434,16 +236,36 @@ $("file").onchange = async e => { try { const d = JSON.parse(await e.target.file
 
 // ===== 場所の検索(国土地理院の住所検索。キー不要) =====
 async function geocode(q) {
+  try {   // 駅名・施設名に強い Nominatim を先に試す
+    const n = await (await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=jp&accept-language=ja&q=" + encodeURIComponent(q))).json();
+    if (n.length) { const parts = n[0].display_name.split(","); return { lat:+n[0].lat, lng:+n[0].lon, name:parts.slice(0, 2).join(" "), short:n[0].name || parts[0] }; }
+  } catch {}
   const r = await (await fetch("https://msearch.gsi.go.jp/address-search/AddressSearch?q=" + encodeURIComponent(q))).json();
   if (!r.length) return null;
   const [lng, lat] = r[0].geometry.coordinates;
-  return { lat, lng, name: r[0].properties.title };
+  return { lat, lng, name: r[0].properties.title, short: "" };
 }
 $("placebtn").onclick = async () => {
   const q = $("place").value.trim(); if (!q) return;
-  try { const g = await geocode(q); if (!g) return alert("見つかりませんでした"); map.setView([g.lat, g.lng], 16); }
+  try { const g = await geocode(q); if (!g) return alert("見つかりませんでした"); showSearchPin(g); }
   catch { alert("検索に失敗しました"); }
 };
+// 検索した場所に仮ピンを立て、ポップアップのボタンからそのまま登録できる
+let searchPin = null;
+function showSearchPin(g) {
+  if (searchPin) map.removeLayer(searchPin);
+  const icon = L.divIcon({ className:"", iconSize:[26,26], iconAnchor:[13,26], popupAnchor:[0,-24],
+    html:'<div class="pin" style="background:#1a73e8"></div>' });
+  const box = document.createElement("div"); box.className = "popup";
+  box.innerHTML = `<b>${esc(g.name)}</b><div class="row"><button data-a="reg">＋ この場所を登録</button><button data-a="x" class="sub">消す</button></div>`;
+  box.onclick = e => {
+    const a = e.target.dataset.a; if (!a) return;
+    map.removeLayer(searchPin); searchPin = null;
+    if (a === "reg") { pending = { lat:g.lat, lng:g.lng }; openDialog(); $("name").value = g.short || ""; $("geores").textContent = "📍 " + g.name; }
+  };
+  searchPin = L.marker([g.lat, g.lng], { icon }).addTo(map).bindPopup(box);
+  map.setView([g.lat, g.lng], 16); searchPin.openPopup();
+}
 $("place").onkeydown = e => { if (e.key === "Enter") $("placebtn").click(); };
 $("geobtn").onclick = async () => {
   const q = $("geo").value.trim(); if (!q) return;
