@@ -70,11 +70,15 @@
   .item b { display:block; font-size:15px; font-weight:500; }
   .item small { color:var(--sub); font-size:13px; }
   .item .dist { color:var(--accent); font-weight:500; margin-left:6px; }
+  .genre-opt { padding:6px 12px; border-radius:16px; font-size:13px; border:2px solid var(--line); background:#fff; color:var(--ink); }
+  .genre-opt.on { color:#fff; border-color:transparent; }
 
   /* ピン・ポップアップ */
-  .taiyaki-pin { position:relative; width:96px; height:59px; filter:drop-shadow(0 2px 3px #0008); }
-  .taiyaki-pin svg { position:absolute; top:0; left:0; width:96px; height:59px; }   /* 画面全体の「svgは24px」設定より優先 */
-  .taiyaki-pin.want { opacity:.55; }
+  .taiyaki-pin { position:relative; width:96px; height:59px; }
+  /* 地図の色と混ざって見えにくくならないよう、白い縁取り(ハロー)を太めに重ねて浮き上がらせる */
+  .taiyaki-pin svg { position:absolute; top:0; left:0; width:96px; height:59px;   /* 画面全体の「svgは24px」設定より優先 */
+    filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 2px #fff) drop-shadow(0 0 2.5px #fff) drop-shadow(0 2px 3px #0009); }
+  .taiyaki-pin.want svg { opacity:.85; }   /* 「食べたい」は輪郭の破線だけで区別し、薄くしすぎて見えなくしない */
   .taiyaki-pin.want svg .outline { stroke-dasharray:4 3; }
   .leaflet-popup-content-wrapper { border-radius:12px; box-shadow:var(--shadow); }
   .leaflet-popup-content { font-family:inherit; margin:12px 14px; }
@@ -192,7 +196,9 @@
     <div style="display:flex;gap:6px"><input id="geo" placeholder="例: 渋谷 ラーメン"><button type="button" class="sub" id="geobtn">検索</button></div>
     <small id="geores" style="color:#777"></small>
     <label>店名 *</label><input id="name" required>
-    <label>あんの種類</label><select id="genre"></select>
+    <label>あんの種類(複数選べます)</label>
+    <div id="genreBox" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px"></div>
+    <input id="genreOther" placeholder="その他の内容を入力" style="display:none;margin-top:8px">
     <label>皮のタイプ</label><select id="skin"><option>薄皮</option><option>厚皮</option><option>もっちり</option></select>
     <label>価格(円)</label><input id="price" type="number" min="0" step="10" placeholder="例: 180">
     <label>評価</label>
@@ -229,6 +235,7 @@ let commentCountByShop = {}; // shop_id -> 件数
 let session = null;          // ログイン中のセッション(未ログインなら null)
 let myProfile = null;        // 自分のニックネーム・アイコン
 let activeGenres = new Set();
+let selectedGenres = new Set();   // 登録ダイアログで選んでいる、あんの種類(複数可)
 let pending = null;   // 追加/編集中 {lat,lng,id?}
 let picking = false;
 let photoData = "";
@@ -239,11 +246,11 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 // たい焼きの形のピン絵。体は「こんがり金色」で統一して一目でたい焼きと分かるようにし、
 // あんの種類は体の中の色バッジ(c)で見分ける
 const taiyakiSvg = c => `<svg width="96" height="59" viewBox="0 0 130 80">
-  <path d="M22,52 L42,52 Q40,66 31,73 Q22,66 22,52 Z" fill="#f0b04d" stroke="#8a5220" stroke-width="4" stroke-linejoin="round"/>
-  <g stroke="#8a522066" stroke-width="2.5" fill="none" stroke-linecap="round"><path d="M27,54 L27,66"/><path d="M32,54 L31,70"/><path d="M37,54 L35,66"/></g>
-  <path class="outline" d="M6,38 C6,24 22,14 44,14 C48,6 60,3 72,14 C80,18 86,26 90,33 L114,10 Q104,38 114,66 L90,45 C82,54 66,62 44,62 C22,62 6,52 6,38 Z" fill="#f0b04d" stroke="#8a5220" stroke-width="4.5" stroke-linejoin="round"/>
+  <path d="M22,52 L42,52 Q40,66 31,73 Q22,66 22,52 Z" fill="#c9781a" stroke="#5c3410" stroke-width="4" stroke-linejoin="round"/>
+  <g stroke="#5c341066" stroke-width="2.5" fill="none" stroke-linecap="round"><path d="M27,54 L27,66"/><path d="M32,54 L31,70"/><path d="M37,54 L35,66"/></g>
+  <path class="outline" d="M6,38 C6,24 22,14 44,14 C48,6 60,3 72,14 C80,18 86,26 90,33 L114,10 Q104,38 114,66 L90,45 C82,54 66,62 44,62 C22,62 6,52 6,38 Z" fill="#c9781a" stroke="#5c3410" stroke-width="4.5" stroke-linejoin="round"/>
   <path d="M14,34 C16,24 28,19 44,18 C60,17 74,22 84,32 C70,26 40,26 14,34 Z" fill="#ffffff55"/>
-  <g stroke="#8a522088" stroke-width="3" fill="none" stroke-linecap="round">
+  <g stroke="#5c341088" stroke-width="3" fill="none" stroke-linecap="round">
     <path d="M52,12 L53,6"/><path d="M59,11 L61,5"/><path d="M66,12 L69,7"/>
     <path d="M42,20 Q34,38 42,58"/><path d="M58,16 Q50,38 58,60"/><path d="M74,20 Q66,38 74,54"/>
     <path d="M95,35 L110,17"/><path d="M96,39 L111,39"/><path d="M95,43 L110,61"/>
@@ -375,7 +382,7 @@ async function loadCloud() {
   (likeRows || []).forEach(r => (likesByShop[r.shop_id] ||= new Set()).add(r.user_id));
   commentCountByShop = {};
   (cmtRows || []).forEach(r => commentCountByShop[r.shop_id] = (commentCountByShop[r.shop_id] || 0) + 1);
-  shops = (shopRows || []).map(r => ({ id:r.id, ownerId:r.owner_id, name:r.name, genre:r.genre, rating:r.rating, status:r.status, skin:r.skin, price:r.price, comment:r.comment, area:r.area, lat:r.lat, lng:r.lng, photo:r.photo }));
+  shops = (shopRows || []).map(r => ({ id:r.id, ownerId:r.owner_id, name:r.name, genres:r.genres && r.genres.length ? r.genres : (r.genre ? [r.genre] : ["その他"]), genreOther:r.genre_other, rating:r.rating, status:r.status, skin:r.skin, price:r.price, comment:r.comment, area:r.area, lat:r.lat, lng:r.lng, photo:r.photo }));
   render();
 }
 function requireAuth() {   // ログイン・ニックネーム設定が済んでいなければ、その場で促す
@@ -491,10 +498,14 @@ const dist = (a, b) => { const R = 6371000, r = Math.PI/180, dLa = (b.lat-a.lat)
 const fmtD = m => m < 1000 ? Math.round(m) + "m" : (m/1000).toFixed(1) + "km";
 const markers = {};
 
+function genreLabel(s){   // 「つぶあん・その他(黒ごま)」のように、複数のあんの種類を表示用の文字にする
+  const list = (s.genres && s.genres.length ? s.genres : ["その他"]).map(g => g === "その他" && s.genreOther ? `その他(${esc(s.genreOther)})` : esc(g));
+  return list.join("・");
+}
 function visible(s){
   const q = $("q").value.trim().toLowerCase();
-  if (activeGenres.size && !activeGenres.has(s.genre)) return false;
-  return !q || (s.name + s.comment + (s.area || "")).toLowerCase().includes(q);
+  if (activeGenres.size && !(s.genres || []).some(g => activeGenres.has(g))) return false;
+  return !q || (s.name + s.comment + (s.area || "") + (s.genres || []).join(" ") + (s.genreOther || "")).toLowerCase().includes(q);
 }
 
 function render(){
@@ -503,7 +514,7 @@ function render(){
   const shown = shops.filter(visible);
   if (sortNear && userPos) shown.sort((a, b) => dist(userPos, a) - dist(userPos, b));
   shown.forEach(s => {
-    const c = GENRES[s.genre] || GENRES["その他"];
+    const c = GENRES[(s.genres && s.genres[0])] || GENRES["その他"];
     const icon = L.divIcon({ className:"", iconSize:[96,59], iconAnchor:[22,54], popupAnchor:[0,-52],
       html:`<div class="taiyaki-pin ${s.status}">${taiyakiSvg(c)}</div>` });
     const m = L.marker([s.lat, s.lng], { icon }).addTo(layer).bindPopup(() => popupHtml(s));
@@ -512,7 +523,7 @@ function render(){
     const likeN = (likesByShop[s.id] || new Set()).size, cmtN = commentCountByShop[s.id] || 0;
     const el = document.createElement("div");
     el.className = "item";
-    el.innerHTML = `${s.photo?`<img src="${s.photo}">`:""}<div><b>${esc(s.name)}</b><small>${owner.nickname?`${owner.avatar||"🐟"} ${esc(owner.nickname)}・`:""}${s.area?`📍 ${esc(s.area)}<br>`:"<br>"}${esc(s.genre)} ${s.skin||""} ${s.price?s.price+"円":""} ${"★".repeat(s.rating)} ${s.status==="want"?"・食べたい":""}${likeN?` ・❤${likeN}`:""}${cmtN?` ・💬${cmtN}`:""}${userPos?`<span class="dist">${fmtD(dist(userPos, s))}</span>`:""}</small></div>`;
+    el.innerHTML = `${s.photo?`<img src="${s.photo}">`:""}<div><b>${esc(s.name)}</b><small>${owner.nickname?`${owner.avatar||"🐟"} ${esc(owner.nickname)}・`:""}${s.area?`📍 ${esc(s.area)}<br>`:"<br>"}${genreLabel(s)} ${s.skin||""} ${s.price?s.price+"円":""} ${"★".repeat(s.rating)} ${s.status==="want"?"・食べたい":""}${likeN?` ・❤${likeN}`:""}${cmtN?` ・💬${cmtN}`:""}${userPos?`<span class="dist">${fmtD(dist(userPos, s))}</span>`:""}</small></div>`;
     el.onclick = () => { if (innerWidth <= 700) closeDrawer(); map.setView([s.lat, s.lng], Math.max(map.getZoom(), 15)); m.openPopup(); };
     list.appendChild(el);
   });
@@ -529,7 +540,7 @@ function popupHtml(s){
   const isOwner = session && session.user.id === s.ownerId;
   d.innerHTML = `<b>${esc(s.name)}</b><br>
     <span style="color:var(--sub);font-size:13px">${owner.avatar||"🐟"} ${esc(owner.nickname||"名無しさん")}${s.area?` ・📍 ${esc(s.area)}`:""}</span><br>
-    ${esc(s.genre)}・${esc(s.skin||"")}${s.price?"・"+s.price+"円":""} ${"★".repeat(s.rating)}${s.photo?`<img src="${s.photo}">`:""}<p style="margin:4px 0">${esc(s.comment)}</p>
+    ${genreLabel(s)}・${esc(s.skin||"")}${s.price?"・"+s.price+"円":""} ${"★".repeat(s.rating)}${s.photo?`<img src="${s.photo}">`:""}<p style="margin:4px 0">${esc(s.comment)}</p>
     <div class="row">
       <button data-a="like" class="${iLiked?"":"sub"}">${iLiked?"❤":"🤍"} ${likes.size||""}</button>
       <button data-a="route" class="sub">ここへ行く</button>
@@ -559,11 +570,28 @@ function renderChips(){
 }
 
 // ---- 追加/編集ダイアログ ----
-$("genre").innerHTML = Object.keys(GENRES).map(g => `<option>${g}</option>`).join("");
+$("genreBox").innerHTML = Object.keys(GENRES).map(g => `<button type="button" class="genre-opt" data-g="${esc(g)}">${esc(g)}</button>`).join("");
+function syncGenreBox(){
+  $("genreBox").querySelectorAll("[data-g]").forEach(b => {
+    const on = selectedGenres.has(b.dataset.g);
+    b.classList.toggle("on", on);
+    b.style.background = on ? GENRES[b.dataset.g] : "#fff";
+  });
+  $("genreOther").style.display = selectedGenres.has("その他") ? "block" : "none";
+}
+$("genreBox").onclick = e => {
+  const g = e.target.dataset.g; if (!g) return;
+  selectedGenres.has(g) ? selectedGenres.delete(g) : selectedGenres.add(g);
+  syncGenreBox();
+};
 function openDialog(s){
   pending = s ? { id:s.id, lat:s.lat, lng:s.lng } : pending;
   $("dtitle").textContent = s ? "お店を編集" : "お店を追加";
-  $("name").value = s?.name || ""; $("genre").value = s?.genre || "つぶあん"; $("skin").value = s?.skin || "薄皮"; $("price").value = s?.price || "";
+  $("name").value = s?.name || "";
+  selectedGenres = new Set(s?.genres?.length ? s.genres : ["つぶあん"]);
+  $("genreOther").value = s?.genreOther || "";
+  syncGenreBox();
+  $("skin").value = s?.skin || "薄皮"; $("price").value = s?.price || "";
   $("rating").value = s?.rating || 5; $("status").value = s?.status || "visited";
   $("comment").value = s?.comment || ""; $("photo").value = ""; $("geo").value = ""; $("geores").textContent = "";
   photoData = s?.photo || "";
@@ -603,7 +631,10 @@ $("form").onsubmit = async ev => {
   ev.preventDefault();
   if (!requireAuth()) { $("dlg").close(); return; }
   if (!pending?.lat) { alert("場所を検索するか、地図をクリックして選んでください"); return; }
-  const data = { name:$("name").value.trim(), genre:$("genre").value, skin:$("skin").value, price:+$("price").value||0, rating:+$("rating").value, status:$("status").value, comment:$("comment").value.trim(), photo:photoData, lat:pending.lat, lng:pending.lng, owner_id:session.user.id };
+  if (!selectedGenres.size) { alert("あんの種類を1つ以上選んでください"); return; }
+  const genres = [...selectedGenres];
+  const genre_other = genres.includes("その他") ? $("genreOther").value.trim() : null;
+  const data = { name:$("name").value.trim(), genres, genre_other, skin:$("skin").value, price:+$("price").value||0, rating:+$("rating").value, status:$("status").value, comment:$("comment").value.trim(), photo:photoData, lat:pending.lat, lng:pending.lng, owner_id:session.user.id };
   const res = pending.id
     ? await sb.from('shops').update(data).eq('id', pending.id).eq('owner_id', session.user.id)
     : await sb.from('shops').insert(data);
@@ -625,7 +656,7 @@ $("file").onchange = async e => {
   if (!requireAuth()) return;
   try {
     const d = JSON.parse(await e.target.files[0].text()); if (!Array.isArray(d)) throw 0;
-    const rows = d.map(s => ({ name:s.name, genre:s.genre, rating:s.rating||5, status:s.status||"visited", skin:s.skin, price:s.price, comment:s.comment, lat:s.lat, lng:s.lng, photo:s.photo||null, owner_id:session.user.id }));
+    const rows = d.map(s => ({ name:s.name, genres:s.genres?.length ? s.genres : (s.genre ? [s.genre] : ["その他"]), genre_other:s.genreOther || null, rating:s.rating||5, status:s.status||"visited", skin:s.skin, price:s.price, comment:s.comment, lat:s.lat, lng:s.lng, photo:s.photo||null, owner_id:session.user.id }));
     const { error } = await sb.from('shops').insert(rows); if (error) throw error;
     await loadCloud(); backfillAreas();
     toast(`${rows.length}件のお店を、自分の投稿として読み込みました`);
