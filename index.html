@@ -7,69 +7,183 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#fff8ec; --ink:#3b2a1e; --accent:#c8781a; --line:#eadfd0; }
+  :root { --bg:#fff; --ink:#202124; --sub:#5f6368; --accent:#1a73e8; --accent-bg:#e8f0fe; --line:#dadce0; --shadow:0 1px 2px #3c40434d, 0 2px 6px 2px #3c404326; }
   * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,"Hiragino Sans","Meiryo",sans-serif; color:var(--ink); background:var(--bg); height:100vh; display:flex; flex-direction:column; }
-  header { padding:10px 14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; border-bottom:1px solid var(--line); background:#fff; }
-  header h1 { font-size:18px; margin:0; color:var(--accent); }
-  header input[type=search] { flex:1; min-width:140px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; }
-  button { cursor:pointer; border:0; border-radius:8px; padding:8px 12px; background:var(--accent); color:#fff; font-size:14px; }
-  button.sub { background:#f1e6d6; color:var(--ink); }
-  #chips { padding:8px 14px; display:flex; gap:6px; flex-wrap:wrap; background:#fff; border-bottom:1px solid var(--line); }
-  .chip { padding:4px 10px; border-radius:999px; border:2px solid var(--c); background:#fff; color:var(--ink); font-size:13px; }
-  .chip.on { background:var(--c); color:#fff; }
-  main { flex:1; display:flex; min-height:0; }
-  #map { flex:1; }
-  #list { width:300px; overflow:auto; background:#fff; border-left:1px solid var(--line); }
-  .item { padding:10px 12px; border-bottom:1px solid var(--line); cursor:pointer; display:flex; gap:8px; }
-  .item:hover { background:#fff3e6; }
-  .item img { width:52px; height:52px; object-fit:cover; border-radius:6px; }
-  .item b { display:block; font-size:14px; }
-  .item small { color:#777; }
-  .pin { width:26px; height:26px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); border:2px solid #fff; box-shadow:0 1px 4px #0006; }
-  .pin.want { opacity:.55; border-style:dashed; border-color:#333; }
-  .popup img { width:100%; max-height:140px; object-fit:cover; border-radius:6px; margin:6px 0; }
-  .popup .row { display:flex; gap:6px; margin-top:6px; }
-  dialog { border:0; border-radius:14px; padding:18px; width:min(420px,92vw); box-shadow:0 8px 30px #0005; }
-  dialog label { display:block; margin:8px 0 2px; font-size:13px; color:#666; }
-  dialog input, dialog select, dialog textarea { width:100%; padding:8px; border:1px solid var(--line); border-radius:8px; font:inherit; }
-  #hint { position:absolute; z-index:500; left:50%; top:130px; transform:translateX(-50%); background:#2b2b2bcc; color:#fff; padding:6px 14px; border-radius:999px; font-size:13px; display:none; }
-  #tools { padding:6px 14px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:#fff8ec; border-bottom:1px solid var(--line); }
-  #tools input { flex:1; min-width:160px; max-width:320px; padding:7px 10px; border:1px solid var(--line); border-radius:8px; }
-  button.on { background:#2b6cb0; color:#fff; }
-  #panel { position:absolute; z-index:600; left:14px; bottom:34px; background:#fff; border-radius:12px; box-shadow:0 4px 16px #0004; padding:10px 12px; font-size:14px; display:none; max-width:min(320px,80vw); }
-  #panel .modes { display:flex; gap:4px; margin:6px 0; }
-  #panel .modes button { flex:1; padding:6px 4px; font-size:13px; }
+  html, body { height:100%; }
+  body { margin:0; font-family:Roboto,"Noto Sans JP","Hiragino Sans","Meiryo",sans-serif; color:var(--ink); background:var(--bg); }
+  #map { position:absolute; inset:0; }
+  button { cursor:pointer; border:0; border-radius:8px; padding:8px 14px; background:var(--accent); color:#fff; font-weight:500; font-size:14px; font-family:inherit; }
+  button:hover { filter:brightness(.95); }
+  button.sub { background:#fff; color:var(--accent); border:1px solid var(--line); }
+  button.on { background:var(--accent-bg); color:#1967d2; border-color:var(--accent); }
+  button.icon { background:none; color:var(--sub); padding:0; width:44px; height:44px; border-radius:50%; display:grid; place-items:center; flex:none; }
+  button.icon:hover { background:#f1f3f4; }
+  svg { fill:currentColor; width:24px; height:24px; }
+
+  /* 検索バー(Googleマップ風の浮かぶカード) */
+  #topbar { position:absolute; z-index:1000; top:12px; left:12px; width:min(392px, calc(100% - 24px)); height:48px; display:flex; align-items:center; background:#fff; border-radius:24px; box-shadow:var(--shadow); padding:0 2px; }
+  #topbar input { flex:1; min-width:0; border:0; outline:0; font-size:16px; font-family:inherit; background:none; padding:0 4px; color:var(--ink); }
+  #topbar input::-webkit-search-cancel-button { display:none; }
+  #placebtn { color:var(--accent); }
+
+  /* 絞り込みチップ */
+  #chips { position:absolute; z-index:900; top:66px; left:12px; right:12px; display:flex; gap:8px; overflow-x:auto; padding:2px 2px 6px; scrollbar-width:none; }
+  #chips::-webkit-scrollbar { display:none; }
+  .chip { flex:none; display:flex; align-items:center; gap:6px; padding:6px 12px; border-radius:16px; border:1px solid var(--line); background:#fff; color:var(--ink); font-size:14px; font-weight:400; box-shadow:0 1px 2px #3c40434d; }
+  .chip::before { content:""; width:10px; height:10px; border-radius:50%; background:var(--c); }
+  .chip.on { background:var(--accent-bg); border-color:var(--accent); color:#1967d2; }
+  .chip:hover { filter:none; background:#f8f9fa; }
+  .chip.on:hover { background:var(--accent-bg); }
+  @media (min-width:701px) { #chips { top:19px; left:416px; right:70px; } }
+
+  /* 右下の丸いボタン */
+  #fabs { position:absolute; z-index:900; right:12px; bottom:96px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .fab { width:48px; height:48px; padding:0; border-radius:50%; background:#fff; color:var(--sub); box-shadow:var(--shadow); display:grid; place-items:center; }
+  .fab:hover { background:#f8f9fa; filter:none; }
+  #fabs { align-items:flex-end; }
+  .fab.primary { width:auto; height:56px; padding:0 22px 0 16px; gap:8px; background:var(--accent); color:#fff; border-radius:28px; grid-auto-flow:column; font-size:15px; font-weight:500; }
+  #addmenu { display:none; flex-direction:column; align-items:flex-end; gap:10px; }
+  #addmenu.open { display:flex; }
+  #addmenu button { display:flex; align-items:center; gap:10px; padding:10px 18px 10px 14px; border-radius:24px; background:#fff; color:var(--ink); border:0; box-shadow:var(--shadow); font-size:15px; white-space:nowrap; }
+  #addmenu button:hover { background:#f8f9fa; filter:none; }
+  #addmenu .ic { font-size:20px; line-height:1; }
+  #hint button { margin-left:10px; padding:2px 10px; border-radius:12px; background:#fff; color:#3c4043; font-size:13px; }
+  .fab.primary:hover { background:#1765cc; }
+  .fab svg { width:26px; height:26px; }
+  .leaflet-bottom.leaflet-right .leaflet-control-zoom { margin-bottom:14px; }
+
+  /* メニュー(PCは左のパネル・スマホは下から出るシート) */
+  #drawer { position:fixed; z-index:1100; top:0; bottom:0; left:0; width:min(380px,100%); background:#fff; box-shadow:var(--shadow); display:flex; flex-direction:column; transform:translateX(-105%); transition:transform .25s ease; }
+  #drawer.open { transform:none; }
+  .dh { display:flex; align-items:center; justify-content:space-between; padding:6px 6px 6px 18px; border-bottom:1px solid var(--line); font-size:18px; }
+  .dq { padding:12px 16px 4px; }
+  .dq input { width:100%; padding:10px 14px; border:1px solid var(--line); border-radius:24px; font:inherit; font-size:15px; outline-color:var(--accent); }
+  .acts { display:flex; flex-wrap:wrap; gap:8px; padding:10px 16px 12px; border-bottom:1px solid var(--line); }
+  .acts button { padding:6px 12px; font-size:13px; border-radius:16px; }
+  #list { flex:1; overflow:auto; }
+  .item { padding:12px 16px; border-bottom:1px solid #f1f3f4; cursor:pointer; display:flex; gap:12px; align-items:center; }
+  .item:hover { background:#f8f9fa; }
+  .item img { width:56px; height:56px; object-fit:cover; border-radius:8px; }
+  .item b { display:block; font-size:15px; font-weight:500; }
+  .item small { color:var(--sub); font-size:13px; }
+  .item .dist { color:var(--accent); font-weight:500; margin-left:6px; }
+
+  /* ピン・ポップアップ */
+  .taiyaki-pin { position:relative; width:96px; height:59px; filter:drop-shadow(0 2px 3px #0008); }
+  .taiyaki-pin svg { position:absolute; top:0; left:0; width:96px; height:59px; }   /* 画面全体の「svgは24px」設定より優先 */
+  .taiyaki-pin.want { opacity:.55; }
+  .taiyaki-pin.want svg .outline { stroke-dasharray:4 3; }
+  .leaflet-popup-content-wrapper { border-radius:12px; box-shadow:var(--shadow); }
+  .leaflet-popup-content { font-family:inherit; margin:12px 14px; }
+  .popup b { font-size:16px; font-weight:500; }
+  .popup img { width:100%; max-height:140px; object-fit:cover; border-radius:8px; margin:6px 0; }
+  .popup .row { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 6px; }
+  .popup .row button { padding:6px 12px; border-radius:16px; font-size:13px; }
+  .popup a { color:var(--accent); text-decoration:none; font-size:13px; }
   .me { width:16px; height:16px; background:#1a73e8; border:3px solid #fff; border-radius:50%; box-shadow:0 0 0 6px #1a73e833; }
-  .item .dist { color:#1a73e8; font-weight:bold; margin-left:6px; }
-  @media (max-width:700px){ main{flex-direction:column;} #list{width:100%;height:32%;border-left:0;border-top:1px solid var(--line);} }
+
+  /* ルート・距離のパネル */
+  #panel { position:absolute; z-index:900; left:12px; bottom:32px; background:#fff; border-radius:12px; box-shadow:var(--shadow); padding:12px 14px; font-size:14px; display:none; max-width:min(340px,calc(100% - 96px)); }
+  #panel .modes { display:flex; gap:6px; margin:8px 0; }
+  #panel .modes button { flex:1; padding:6px 4px; font-size:13px; border-radius:16px; }
+  .stn { width:14px; height:14px; border-radius:50%; background:#fff; border:3px solid #455a64; box-shadow:0 1px 3px #0005; }
+  .stn-label { background:#fffffff2; border:1px solid #455a64; border-radius:4px; color:#263238; font-size:12px; font-weight:500; padding:1px 5px; box-shadow:none; }
+  .stn-label::before { display:none; }
+  #toast { position:absolute; z-index:1200; left:50%; bottom:28px; transform:translate(-50%,20px); background:#3c4043; color:#fff; padding:10px 18px; border-radius:8px; font-size:14px; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:.25s; max-width:calc(100% - 32px); text-align:center; }
+  #toast.show { opacity:1; transform:translate(-50%,0); }
+  #hint { position:absolute; z-index:950; left:50%; top:112px; transform:translateX(-50%); background:#3c4043; color:#fff; padding:8px 16px; border-radius:4px; font-size:14px; display:none; box-shadow:var(--shadow); }
+
+  /* 登録ダイアログ */
+  dialog { border:0; border-radius:16px; padding:22px; width:min(440px,92vw); box-shadow:0 8px 30px #0005; font-family:inherit; }
+  dialog h3 { margin:0 0 6px; font-weight:500; font-size:20px; }
+  dialog label { display:block; margin:12px 0 4px; font-size:13px; color:var(--sub); }
+  dialog input, dialog select, dialog textarea { width:100%; padding:10px; border:1px solid var(--line); border-radius:8px; font:inherit; outline-color:var(--accent); }
+
+  @media (max-width:700px) {
+    #drawer { top:auto; left:0; right:0; width:auto; height:64vh; border-radius:16px 16px 0 0; transform:translateY(105%); }
+    #drawer.open { transform:none; }
+    .leaflet-control-zoom { display:none; }
+    #fabs { bottom:32px; }
+    #panel { right:12px; max-width:none; bottom:104px; }
+    .stn { width:14px; height:14px; border-radius:50%; background:#fff; border:3px solid #455a64; box-shadow:0 1px 3px #0005; }
+  .stn-label { background:#fffffff2; border:1px solid #455a64; border-radius:4px; color:#263238; font-size:12px; font-weight:500; padding:1px 5px; box-shadow:none; }
+  .stn-label::before { display:none; }
+  #toast { position:absolute; z-index:1200; left:50%; bottom:28px; transform:translate(-50%,20px); background:#3c4043; color:#fff; padding:10px 18px; border-radius:8px; font-size:14px; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:.25s; max-width:calc(100% - 32px); text-align:center; }
+  #toast.show { opacity:1; transform:translate(-50%,0); }
+  #hint { top:118px; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>🐟 たい焼き名店記録</h1>
-  <input id="q" type="search" placeholder="店名・ひとことで検索">
-  <button id="add">＋ 店を追加</button>
-  <button class="sub" id="locate">現在地</button>
-  <button class="sub" id="export">書き出し</button>
-  <button class="sub" id="import">読み込み</button>
-  <input id="file" type="file" accept="application/json" hidden>
-</header>
-<div id="tools">
-  <input id="place" type="search" placeholder="住所・駅名で地図を移動">
-  <button class="sub" id="placebtn">移動</button>
-  <button class="sub" id="track">現在地を追う</button>
-  <button class="sub" id="near">近い順</button>
-  <button class="sub" id="measure">距離を測る</button>
+<div id="map"></div>
+
+<div id="topbar">
+  <button class="icon" id="menu" aria-label="メニュー"><svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg></button>
+  <input id="place" type="search" placeholder="住所・駅名を検索">
+  <button class="icon" id="placebtn" aria-label="検索"><svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg></button>
 </div>
 <div id="chips"></div>
+
+<div id="fabs">
+  <div id="addmenu">
+    <button id="addSearch"><span class="ic">🔍</span>住所・駅名から探して登録</button>
+    <button id="addMap"><span class="ic">📍</span>地図で場所を選んで登録</button>
+    <button id="addHere"><span class="ic">🎯</span>いまいる場所で登録</button>
+  </div>
+  <button class="fab" id="locate" title="現在地" aria-label="現在地"><svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0 0 13 3.06V1h-2v2.06A8.994 8.994 0 0 0 3.06 11H1v2h2.06A8.994 8.994 0 0 0 11 20.94V23h2v-2.06A8.994 8.994 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg></button>
+  <button class="fab primary" id="add" title="お店を追加" aria-label="お店を追加"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>お店を追加</button>
+</div>
 <div id="panel"></div>
-<div id="hint">地図をクリックして場所を選んでください</div>
-<main>
-  <div id="map"></div>
+<div id="toast" role="status"></div>
+<div id="hint"><span>地図をタップして場所を選んでください</span><button id="hintx">やめる</button></div>
+
+<aside id="drawer">
+  <div class="dh"><b>🐟 たい焼き名店記録</b><button class="icon" id="close" aria-label="閉じる"><svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button></div>
+  <div id="authRow" style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:14px;display:flex;align-items:center;justify-content:space-between;gap:8px"></div>
+  <div class="dq"><input id="q" type="search" placeholder="保存した店を検索"></div>
+  <div class="acts">
+    <button class="sub" id="rankBtn">🏆 ランキング</button>
+    <button class="sub" data-line="pref" title="都道府県の境界線(濃い赤)">県境</button>
+    <button class="sub" id="stnBtn" title="各市区の主要駅を目印として表示します(ズーム11以上で駅名も表示)">主要駅</button>
+    <button class="sub" data-line="city" title="市区町村の境界線(オンにするとタイル量が増え、少し重くなります)">市区町村界</button>
+    <button class="sub" id="track">現在地を追う</button>
+    <button class="sub" id="near">近い順</button>
+    <button class="sub" id="measure">距離を測る</button>
+    <button class="sub" id="export">書き出し</button>
+    <button class="sub" id="import">読み込み</button>
+    <input id="file" type="file" accept="application/json" hidden>
+  </div>
+  <div id="rankBox" style="display:none; border-bottom:1px solid var(--line);"></div>
   <div id="list"></div>
-</main>
+</aside>
+
+<dialog id="loginDlg">
+  <form method="dialog" id="loginForm">
+    <h3>📧 メールでログイン</h3>
+    <p style="color:var(--sub);font-size:14px;margin:0">パスワードは不要です。入力したメール宛に、ログイン用のリンクが届きます。</p>
+    <label>メールアドレス</label><input id="loginEmail" type="email" required placeholder="example@mail.com">
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+      <button type="button" class="sub" id="loginCancel">閉じる</button>
+      <button type="submit">リンクを送る</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="profileDlg">
+  <form method="dialog" id="profileForm">
+    <h3>ニックネームを決めよう</h3>
+    <p style="color:var(--sub);font-size:14px;margin:0">投稿・いいね・コメントに、この名前とアイコンが表示されます。</p>
+    <label>ニックネーム</label><input id="pfNick" maxlength="20" required placeholder="例: たい焼き太郎">
+    <label>アイコン</label>
+    <div id="pfAvatars" style="display:flex;gap:8px;font-size:22px;margin-top:4px"></div>
+    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+      <button type="submit">はじめる</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="dlg">
   <form method="dialog" id="form">
@@ -96,32 +210,282 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet.vectorgrid@1.3.0/dist/Leaflet.VectorGrid.bundled.min.js"></script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
 const GENRES = { "つぶあん":"#a1442c", "こしあん":"#6d4c41", "カスタード":"#f2a900", "白あん":"#8a9a5b", "変わり種":"#ae3ec9", "その他":"#495057" };
-const KEY = "taiyaki.v1";
-const SAMPLE = [
-  {id:1,name:"サンプル鯛焼き店",genre:"つぶあん",rating:5,status:"visited",skin:"薄皮",price:180,comment:"羽根つきでパリパリ。しっぽまであんこ入り。",lat:35.6595,lng:139.7005,photo:""},
-  {id:2,name:"サンプル焼き処",genre:"カスタード",rating:4,status:"want",skin:"厚皮",price:200,comment:"行列覚悟の名店らしい。",lat:35.6586,lng:139.7454,photo:""}
-];
-let shops = load();
+// ===== みんなの投稿を集める共有データベース(Supabase。無料枠で運用) =====
+// 公開鍵(publishable key)は、みんなに見せるサイトに埋め込む前提の鍵。書き込みは各テーブルのRLS(行単位の許可設定)で
+// 「自分の投稿だけ」に制限しているので、この鍵が見えても他人の投稿を書き換えることはできない。
+const SUPA_URL = "https://selngdekcnoplgdsvqiu.supabase.co";
+const SUPA_KEY = "sb_publishable_n8GSHYBDMZQFi4PTX6lvqw_L9MJUMxK";
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+const AVATARS = ["🐟","🍰","🧁","🍡","🍙","😊","🎌","⭐"];
+
+let shops = [];              // 共有DBから読み込んだお店(みんなに見える)
+let profilesById = {};       // user_id -> {id,nickname,avatar}
+let likesByShop = {};        // shop_id -> Set(user_id)
+let commentCountByShop = {}; // shop_id -> 件数
+let session = null;          // ログイン中のセッション(未ログインなら null)
+let myProfile = null;        // 自分のニックネーム・アイコン
 let activeGenres = new Set();
 let pending = null;   // 追加/編集中 {lat,lng,id?}
 let picking = false;
 let photoData = "";
+let pfAvatar = AVATARS[0];
 
-function load(){ try { return JSON.parse(localStorage.getItem(KEY)) || SAMPLE; } catch { return SAMPLE; } }
-function persist(){ try { localStorage.setItem(KEY, JSON.stringify(shops)); } catch { alert("保存容量がいっぱいです(写真が多すぎるかも)。書き出しでバックアップしてください。"); } }
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// たい焼きの形のピン絵。体は「こんがり金色」で統一して一目でたい焼きと分かるようにし、
+// あんの種類は体の中の色バッジ(c)で見分ける
+const taiyakiSvg = c => `<svg width="96" height="59" viewBox="0 0 130 80">
+  <path d="M22,52 L42,52 Q40,66 31,73 Q22,66 22,52 Z" fill="#f0b04d" stroke="#8a5220" stroke-width="4" stroke-linejoin="round"/>
+  <g stroke="#8a522066" stroke-width="2.5" fill="none" stroke-linecap="round"><path d="M27,54 L27,66"/><path d="M32,54 L31,70"/><path d="M37,54 L35,66"/></g>
+  <path class="outline" d="M6,38 C6,24 22,14 44,14 C48,6 60,3 72,14 C80,18 86,26 90,33 L114,10 Q104,38 114,66 L90,45 C82,54 66,62 44,62 C22,62 6,52 6,38 Z" fill="#f0b04d" stroke="#8a5220" stroke-width="4.5" stroke-linejoin="round"/>
+  <path d="M14,34 C16,24 28,19 44,18 C60,17 74,22 84,32 C70,26 40,26 14,34 Z" fill="#ffffff55"/>
+  <g stroke="#8a522088" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M52,12 L53,6"/><path d="M59,11 L61,5"/><path d="M66,12 L69,7"/>
+    <path d="M42,20 Q34,38 42,58"/><path d="M58,16 Q50,38 58,60"/><path d="M74,20 Q66,38 74,54"/>
+    <path d="M95,35 L110,17"/><path d="M96,39 L111,39"/><path d="M95,43 L110,61"/>
+    <path d="M9,43 Q15,47 21,44"/>
+  </g>
+  <circle cx="20" cy="31" r="5" fill="#3b2a1e"/><circle cx="21.6" cy="29.4" r="1.6" fill="#fff"/>
+  <circle cx="54" cy="42" r="10" fill="${c}" stroke="#fff" stroke-width="3"/>
+</svg>`;
 
-const map = L.map("map").setView([35.68, 139.72], 12);
+const map = L.map("map", { zoomControl:false }).setView([35.68, 139.72], 12);
+L.control.zoom({ position:"bottomright" }).addTo(map);
 const gsi = (k, ext) => L.tileLayer(`https://cyberjapandata.gsi.go.jp/xyz/${k}/{z}/{x}/{y}.${ext}`, { maxZoom:18, attribution:"<a href='https://maps.gsi.go.jp/development/ichiran.html'>地理院タイル</a>" });
 const base = { "地図": gsi("std","png"), "淡色": gsi("pale","png"), "航空写真": gsi("seamlessphoto","jpg") };
 base["地図"].addTo(map);
-L.control.layers(base, null, { position:"topright" }).addTo(map);
+// 行政界: 国土地理院のベクトルタイル(キー不要)。紫=都道府県界 / 橙の実線=市町村界 / 橙の破線=区界
+// ===== 境界線タイルの保存(案3)=====
+// 一度読んだ境界線タイルをメモリと IndexedDB に保存し、次回から通信せずに出す(30日)。
+const TILE_KEY = "/xyz/experimental_bvmap/", TILE_TTL = 30 * 864e5, TILE_MAX = 1500;
+const tileMem = new Map();
+// 保存先が応答しない場合(ブロック等)でも読み込みが止まらないよう、待ち時間の上限を設けて通信に切り替える
+const within = (p, ms) => Promise.race([p, new Promise(ok => setTimeout(() => ok(null), ms))]);
+const tileDB = within(new Promise(ok => { try { const r = indexedDB.open("shopmap-tiles", 1); r.onupgradeneeded = () => r.result.createObjectStore("t"); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); r.onblocked = () => ok(null); } catch { ok(null); } }), 2000);
+const tileTx = async mode => { const db = await tileDB; return db ? db.transaction("t", mode).objectStore("t") : null; };
+const tileGet = async k => { try { const st = await tileTx("readonly"); return st ? await within(new Promise(ok => { const q = st.get(k); q.onsuccess = () => ok(q.result || null); q.onerror = () => ok(null); }), 1500) : null; } catch { return null; } };
+const tilePut = async (k, blob) => { try { const st = await tileTx("readwrite"); st && st.put({ blob, time: Date.now() }, k); } catch {} };
+(async () => {   // 起動時に古い・多すぎる保存分を掃除
+  try {
+    const st = await tileTx("readwrite"); if (!st) return; const rows = [];
+    st.openCursor().onsuccess = e => {
+      const c = e.target.result;
+      if (c) { rows.push([c.key, c.value.time]); c.continue(); return; }
+      rows.sort((a, b) => a[1] - b[1]);
+      const drop = rows.filter((r, i) => Date.now() - r[1] > TILE_TTL || i < rows.length - TILE_MAX);
+      drop.forEach(r => st.delete(r[0]));
+    };
+  } catch {}
+})();
+const rawFetch = window.fetch.bind(window);
+window.fetch = async (input, init) => {
+  const url = typeof input === "string" ? input : input.url;
+  if (!url.includes(TILE_KEY)) return rawFetch(input, init);
+  let blob = tileMem.get(url);
+  if (!blob) { const rec = await tileGet(url); if (rec && Date.now() - rec.time < TILE_TTL) blob = rec.blob; }
+  if (!blob) {
+    const r = await rawFetch(input, init);
+    if (!r.ok) return r;
+    blob = await r.blob(); tilePut(url, blob);
+  }
+  tileMem.delete(url); tileMem.set(url, blob);
+  if (tileMem.size > 400) tileMem.delete(tileMem.keys().next().value);
+  return new Response(blob, { status: 200 });
+};const HIDE = { stroke:false, fill:false, weight:0, opacity:0, fillOpacity:0 };
+// 行政界: 県境・市区町村界は、ボタンでオンにしたときだけ読み込む(ズームの制限なし)
+// (国土地理院のデータは 1211=都道府県界 / 1212=市区町村界 / 1221=海上の境界。市と区・町村を見分ける情報は無い)
+// ズームの制限なし: 選んだ境界線は、どのズームでも表示する
+// (国土地理院のデータは 1211=都道府県界 / 1212=市区町村界 / 1221=その他の区分。市と区を見分ける情報は無い)
+const BVMAP = "https://cyberjapandata.gsi.go.jp/xyz/experimental_bvmap/{z}/{x}/{y}.pbf";
+const adminLayer = (pick, extra = {}) => {
+  const l = L.vectorGrid.protobuf(BVMAP, {
+    maxNativeZoom:16, interactive:false,
+    keepBuffer:6,              // 画面の外側のタイルを多めに保持(パン後すぐ出る)
+    updateWhenIdle:false,      // 動かしている最中から読み込む
+    updateWhenZooming:false,   // 拡大縮小の途中は描き直さず、前の線を引き伸ばして残す
+    updateInterval:100,
+    ...extra,
+    vectorTileLayerStyles: new Proxy({}, { get: (_, name) => name !== "boundary" ? HIDE : ((p, z) => pick(Number(p.ftCode), z) || HIDE) })
+  });
+  const tb = l._getTiledPixelBounds;   // 画面より1タイル分外側まで先読み
+  l._getTiledPixelBounds = function (c) { const b = tb.call(this, c); return L.bounds(b.min.subtract([256, 256]), b.max.add([256, 256])); };
+  return l;
+};
+const prefLayer = adminLayer(c => c === 1211 && { weight:4, color:"#b71c1c", opacity:1, fill:false }, { maxNativeZoom: 15 });   // ズーム16以上でも県界が途切れないよう、ズーム15のタイルを拡大して使う
+const cityLayer = adminLayer(c => c === 1212 && { weight:5, color:"#e65100", opacity:.6, fill:false }, { keepBuffer:3 });
+// 境界線は選んだものだけ読み込む(最初はどちらもオフ=最も軽い)。選択は次回も覚える
+const LINES_KEY = "shopmap.lines";
+let linesOn = { pref:false, city:false };
+try { Object.assign(linesOn, JSON.parse(localStorage.getItem(LINES_KEY)) || {}); } catch {}
+if (linesOn.pref) prefLayer.addTo(map);
+if (linesOn.city) cityLayer.addTo(map);
+L.control.layers(base, { '<span style="color:#b71c1c">■</span> 県境': prefLayer, '<span style="color:#e65100">■</span> 市区町村界': cityLayer }, { position:"topright" }).addTo(map);
+const syncLines = () => {
+  linesOn = { pref: map.hasLayer(prefLayer), city: map.hasLayer(cityLayer) };
+  try { localStorage.setItem(LINES_KEY, JSON.stringify(linesOn)); } catch {}
+  document.querySelectorAll("[data-line]").forEach(b => b.classList.toggle("on", linesOn[b.dataset.line]));
+};
+map.on("overlayadd overlayremove", syncLines);
+let toastT = null;
+const toast = msg => { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 4500); };
+map.on("overlayadd", e => { if (e.layer === prefLayer || e.layer === cityLayer) toast("ℹ️ 境界線を表示すると、地図が少し重くなることがあります。重いときはオフにしてください。"); });
 L.control.scale({ imperial:false }).addTo(map);
-const layer = L.markerClusterGroup({ maxClusterRadius:40 }).addTo(map);
+const layer = L.markerClusterGroup({ maxClusterRadius:70 }).addTo(map);
 let userPos = null, sortNear = false;
+// 所在地: 国土地理院の逆ジオコーダ(座標→市町村コード)+ 市町村名の表
+let muniP = null;
+const muniTable = () => muniP ||= (async () => {
+  const t = await (await fetch("https://maps.gsi.go.jp/js/muni.js")).text(), tbl = {};
+  for (const m of t.matchAll(/MUNI_ARRAY\["(\d+)"\]\s*=\s*'(\d+),([^,]*),(\d+),([^']*)'/g)) tbl[m[1]] = { pref:m[3], city:m[5].replace(/[\s\u3000]/g, "") };
+  return tbl;
+})().catch(() => { muniP = null; return null; });
+async function areaOf(lat, lng) {
+  try {
+    const r = await (await fetch(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lon=${lng}&lat=${lat}`)).json();
+    const t = await muniTable(), m = t && t[String(+r.results.muniCd)];
+    return m ? `${m.pref} ${m.city}` : "";
+  } catch { return ""; }
+}
+let filling = false;
+async function backfillAreas() {   // 所在地が未取得の店を順に埋める(自分の投稿だけ、共有DBにも書き戻す)
+  if (filling) return; filling = true; let changed = false;
+  for (const s of shops) if (s.area == null) {
+    const a = await areaOf(s.lat, s.lng);
+    if (a) { s.area = a; changed = true; if (session && s.ownerId === session.user.id) sb.from('shops').update({ area:a }).eq('id', s.id).then(()=>{}); }
+  }
+  filling = false;
+  if (changed) render();
+}
+
+// ===== 共有データベース(Supabase)との読み書き =====
+async function loadCloud() {
+  const [{ data: shopRows, error }, { data: profRows }, { data: likeRows }, { data: cmtRows }] = await Promise.all([
+    sb.from('shops').select('*').order('created_at', { ascending:false }),
+    sb.from('profiles').select('id,nickname,avatar'),
+    sb.from('likes').select('shop_id,user_id'),
+    sb.from('comments').select('shop_id'),
+  ]);
+  if (error) { toast("読み込みに失敗しました:" + error.message); return; }
+  profilesById = Object.fromEntries((profRows || []).map(p => [p.id, p]));
+  likesByShop = {};
+  (likeRows || []).forEach(r => (likesByShop[r.shop_id] ||= new Set()).add(r.user_id));
+  commentCountByShop = {};
+  (cmtRows || []).forEach(r => commentCountByShop[r.shop_id] = (commentCountByShop[r.shop_id] || 0) + 1);
+  shops = (shopRows || []).map(r => ({ id:r.id, ownerId:r.owner_id, name:r.name, genre:r.genre, rating:r.rating, status:r.status, skin:r.skin, price:r.price, comment:r.comment, area:r.area, lat:r.lat, lng:r.lng, photo:r.photo }));
+  render();
+}
+function requireAuth() {   // ログイン・ニックネーム設定が済んでいなければ、その場で促す
+  if (!session) { openLoginDialog(); return false; }
+  if (!myProfile) { openProfileDialog(); return false; }
+  return true;
+}
+async function toggleLike(s) {
+  if (!requireAuth()) return;
+  const uid = session.user.id, has = (likesByShop[s.id] || new Set()).has(uid);
+  if (has) await sb.from('likes').delete().eq('shop_id', s.id).eq('user_id', uid);
+  else await sb.from('likes').insert({ shop_id:s.id, user_id:uid });
+  await loadCloud();
+  markers[s.id]?.openPopup();
+}
+async function updateShopStatus(s) {
+  const { error } = await sb.from('shops').update({ status: s.status === "want" ? "visited" : "want" }).eq('id', s.id).eq('owner_id', session.user.id);
+  if (error) return alert("更新に失敗しました:" + error.message);
+  await loadCloud();
+}
+async function deleteShop(id) {
+  const { error } = await sb.from('shops').delete().eq('id', id).eq('owner_id', session.user.id);
+  if (error) return alert("削除に失敗しました:" + error.message);
+  await loadCloud();
+}
+async function loadComments(shopId, popupEl) {
+  const box = popupEl.querySelector(".cmts"); if (!box) return;
+  const { data } = await sb.from('comments').select('id,user_id,text,created_at').eq('shop_id', shopId).order('created_at');
+  const rows = (data || []).map(c => { const p = profilesById[c.user_id] || {}; return `<div style="margin:4px 0;font-size:13px"><b>${p.avatar || "🐟"} ${esc(p.nickname || "名無しさん")}</b> ${esc(c.text)}</div>`; }).join("") || `<small style="color:var(--sub)">まだコメントはありません</small>`;
+  box.innerHTML = `<div style="max-height:120px;overflow:auto;border-top:1px solid var(--line);margin-top:8px;padding-top:6px">${rows}</div>
+    <div style="display:flex;gap:6px;margin-top:6px"><input data-cmtinput placeholder="コメントする" style="flex:1;padding:6px 8px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13px"><button data-a="cmtsend" style="padding:6px 10px;font-size:13px">送信</button></div>`;
+}
+async function sendComment(s, popupEl) {
+  if (!requireAuth()) return;
+  const input = popupEl.querySelector("[data-cmtinput]"), text = input.value.trim(); if (!text) return;
+  const { error } = await sb.from('comments').insert({ shop_id:s.id, user_id:session.user.id, text });
+  if (error) return alert("送信に失敗しました:" + error.message);
+  input.value = "";
+  commentCountByShop[s.id] = (commentCountByShop[s.id] || 0) + 1;
+  await loadComments(s.id, popupEl);
+}
+
+// ===== ログイン・ニックネーム =====
+function openLoginDialog() { $("loginEmail").value = ""; $("loginDlg").showModal(); }
+$("loginCancel").onclick = () => $("loginDlg").close();
+$("loginForm").onsubmit = async ev => {
+  ev.preventDefault();
+  const email = $("loginEmail").value.trim(); if (!email) return;
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href.split("#")[0] } });
+  $("loginDlg").close();
+  toast(error ? "送信に失敗しました:" + error.message : `📧 ${email} にログインリンクを送りました。メールを確認してください。`);
+};
+$("pfAvatars").innerHTML = AVATARS.map(a => `<button type="button" data-em="${a}" style="padding:4px 8px;border-radius:8px;background:#f1f3f4;border:2px solid transparent">${a}</button>`).join("");
+$("pfAvatars").onclick = e => {
+  const em = e.target.dataset.em; if (!em) return; pfAvatar = em;
+  $("pfAvatars").querySelectorAll("button").forEach(b => b.style.borderColor = b.dataset.em === em ? "var(--accent)" : "transparent");
+};
+function openProfileDialog() {
+  $("pfNick").value = ""; pfAvatar = AVATARS[0];
+  $("pfAvatars").querySelectorAll("button").forEach(b => b.style.borderColor = b.dataset.em === pfAvatar ? "var(--accent)" : "transparent");
+  $("profileDlg").showModal();
+}
+$("profileForm").onsubmit = async ev => {
+  ev.preventDefault();
+  const nickname = $("pfNick").value.trim(); if (!nickname) return;
+  const uid = session.user.id;
+  const { error } = await sb.from('profiles').insert({ id:uid, nickname, avatar:pfAvatar });
+  if (error) return alert("登録に失敗しました:" + error.message);
+  myProfile = { id:uid, nickname, avatar:pfAvatar }; profilesById[uid] = myProfile;
+  $("profileDlg").close();
+  render();
+};
+async function ensureProfile() {
+  if (!session) return;
+  const { data } = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+  if (data) { myProfile = data; profilesById[data.id] = data; render(); }
+  else openProfileDialog();
+}
+function updateAuthUI() {
+  const row = $("authRow"); if (!row) return;
+  if (session) {
+    const p = myProfile || {}, mine = shops.filter(s => s.ownerId === session.user.id).length;
+    const badge = mine >= 10 ? "🥇" : mine >= 5 ? "🥈" : mine >= 1 ? "🥉" : "";
+    row.innerHTML = `<span>${p.avatar || "🐟"} ${esc(p.nickname || "設定中…")} ${badge}<br><small style="color:var(--sub)">${mine}件投稿</small></span><button class="sub" id="logoutBtn" style="padding:4px 10px;font-size:12px">ログアウト</button>`;
+    $("logoutBtn").onclick = async () => { await sb.auth.signOut(); session = null; myProfile = null; updateAuthUI(); toast("ログアウトしました"); };
+  } else {
+    row.innerHTML = `<button id="loginBtn" style="padding:6px 14px;font-size:13px">📧 メールでログイン</button>`;
+    $("loginBtn").onclick = openLoginDialog;
+  }
+}
+
+// ===== ランキング =====
+function renderRanking() {
+  const box = $("rankBox"); if (!box || box.style.display === "none") return;
+  const byId = Object.fromEntries(shops.map(s => [s.id, s]));
+  const likeRank = Object.entries(likesByShop).map(([id, set]) => ({ id:+id, n:set.size })).filter(x => byId[x.id]).sort((a, b) => b.n - a.n).slice(0, 5);
+  const postCounts = {}; shops.forEach(s => postCounts[s.ownerId] = (postCounts[s.ownerId] || 0) + 1);
+  const postRank = Object.entries(postCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  box.innerHTML = `
+    <h4 style="margin:14px 16px 4px;font-size:14px;font-weight:500">🏆 人気ランキング</h4>
+    ${likeRank.length ? likeRank.map((x, i) => `<div class="item" style="cursor:pointer" data-goto="${x.id}"><span>#${i + 1} ${esc(byId[x.id].name)}</span><span style="margin-left:auto;color:var(--accent)">❤${x.n}</span></div>`).join("") : `<div class="item" style="color:var(--sub)">まだいいねがありません</div>`}
+    <h4 style="margin:14px 16px 4px;font-size:14px;font-weight:500">📮 投稿数ランキング</h4>
+    ${postRank.length ? postRank.map(([uid, n], i) => { const p = profilesById[uid] || {}; return `<div class="item"><span>#${i + 1} ${p.avatar || "🐟"} ${esc(p.nickname || "名無しさん")}</span><span style="margin-left:auto;color:var(--accent)">${n}件</span></div>`; }).join("") : `<div class="item" style="color:var(--sub)">まだ投稿がありません</div>`}`;
+  box.querySelectorAll("[data-goto]").forEach(el => el.onclick = () => {
+    const s = byId[+el.dataset.goto]; if (!s) return;
+    if (innerWidth <= 700) closeDrawer();
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 15)); markers[s.id]?.openPopup();
+  });
+}
+$("rankBtn").onclick = () => { const box = $("rankBox"); box.style.display = box.style.display === "none" ? "block" : "none"; $("rankBtn").classList.toggle("on"); renderRanking(); };
 const dist = (a, b) => { const R = 6371000, r = Math.PI/180, dLa = (b.lat-a.lat)*r, dLn = (b.lng-a.lng)*r;
   const h = Math.sin(dLa/2)**2 + Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLn/2)**2; return 2*R*Math.asin(Math.sqrt(h)); };
 const fmtD = m => m < 1000 ? Math.round(m) + "m" : (m/1000).toFixed(1) + "km";
@@ -130,7 +494,7 @@ const markers = {};
 function visible(s){
   const q = $("q").value.trim().toLowerCase();
   if (activeGenres.size && !activeGenres.has(s.genre)) return false;
-  return !q || (s.name + s.comment).toLowerCase().includes(q);
+  return !q || (s.name + s.comment + (s.area || "")).toLowerCase().includes(q);
 }
 
 function render(){
@@ -139,33 +503,51 @@ function render(){
   const shown = shops.filter(visible);
   if (sortNear && userPos) shown.sort((a, b) => dist(userPos, a) - dist(userPos, b));
   shown.forEach(s => {
-    const icon = L.divIcon({ className:"", iconSize:[26,26], iconAnchor:[13,26], popupAnchor:[0,-24],
-      html:`<div class="pin ${s.status}" style="background:${GENRES[s.genre]||GENRES["その他"]}"></div>` });
+    const c = GENRES[s.genre] || GENRES["その他"];
+    const icon = L.divIcon({ className:"", iconSize:[96,59], iconAnchor:[22,54], popupAnchor:[0,-52],
+      html:`<div class="taiyaki-pin ${s.status}">${taiyakiSvg(c)}</div>` });
     const m = L.marker([s.lat, s.lng], { icon }).addTo(layer).bindPopup(() => popupHtml(s));
     markers[s.id] = m;
+    const owner = profilesById[s.ownerId] || {};
+    const likeN = (likesByShop[s.id] || new Set()).size, cmtN = commentCountByShop[s.id] || 0;
     const el = document.createElement("div");
     el.className = "item";
-    el.innerHTML = `${s.photo?`<img src="${s.photo}">`:""}<div><b>${esc(s.name)}</b><small>${esc(s.genre)} ${s.skin||""} ${s.price?s.price+"円":""} ${"★".repeat(s.rating)} ${s.status==="want"?"・食べたい":""}${userPos?`<span class="dist">${fmtD(dist(userPos, s))}</span>`:""}</small></div>`;
-    el.onclick = () => { map.setView([s.lat, s.lng], Math.max(map.getZoom(), 15)); m.openPopup(); };
+    el.innerHTML = `${s.photo?`<img src="${s.photo}">`:""}<div><b>${esc(s.name)}</b><small>${owner.nickname?`${owner.avatar||"🐟"} ${esc(owner.nickname)}・`:""}${s.area?`📍 ${esc(s.area)}<br>`:"<br>"}${esc(s.genre)} ${s.skin||""} ${s.price?s.price+"円":""} ${"★".repeat(s.rating)} ${s.status==="want"?"・食べたい":""}${likeN?` ・❤${likeN}`:""}${cmtN?` ・💬${cmtN}`:""}${userPos?`<span class="dist">${fmtD(dist(userPos, s))}</span>`:""}</small></div>`;
+    el.onclick = () => { if (innerWidth <= 700) closeDrawer(); map.setView([s.lat, s.lng], Math.max(map.getZoom(), 15)); m.openPopup(); };
     list.appendChild(el);
   });
-  if (!list.children.length) list.innerHTML = `<div class="item">該当するお店がありません</div>`;
+  if (!list.children.length) list.innerHTML = `<div class="item">まだ投稿がありません。最初のたい焼き店を追加してみましょう!</div>`;
+  updateAuthUI();
+  renderRanking();
 }
 
 function popupHtml(s){
   const d = document.createElement("div"); d.className = "popup";
-  d.innerHTML = `<b>${esc(s.name)}</b><br>${esc(s.genre)}・${esc(s.skin||"")}${s.price?"・"+s.price+"円":""} ${"★".repeat(s.rating)}${s.photo?`<img src="${s.photo}">`:""}<p style="margin:4px 0">${esc(s.comment)}</p>
-    <div class="row"><button data-a="toggle" class="sub">${s.status==="want"?"✔ 食べた!":"食べたいに戻す"}</button>
-    <button data-a="route" class="sub">ここへ行く</button><button data-a="edit" class="sub">編集</button><button data-a="del" class="sub">削除</button></div>
-    <a target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">経路を見る</a>`;
+  const owner = profilesById[s.ownerId] || {};
+  const likes = likesByShop[s.id] || new Set();
+  const iLiked = session && likes.has(session.user.id);
+  const isOwner = session && session.user.id === s.ownerId;
+  d.innerHTML = `<b>${esc(s.name)}</b><br>
+    <span style="color:var(--sub);font-size:13px">${owner.avatar||"🐟"} ${esc(owner.nickname||"名無しさん")}${s.area?` ・📍 ${esc(s.area)}`:""}</span><br>
+    ${esc(s.genre)}・${esc(s.skin||"")}${s.price?"・"+s.price+"円":""} ${"★".repeat(s.rating)}${s.photo?`<img src="${s.photo}">`:""}<p style="margin:4px 0">${esc(s.comment)}</p>
+    <div class="row">
+      <button data-a="like" class="${iLiked?"":"sub"}">${iLiked?"❤":"🤍"} ${likes.size||""}</button>
+      <button data-a="route" class="sub">ここへ行く</button>
+      ${isOwner?`<button data-a="toggle" class="sub">${s.status==="want"?"✔ 食べた!":"食べたいに戻す"}</button><button data-a="edit" class="sub">編集</button><button data-a="del" class="sub">削除</button>`:""}
+    </div>
+    <a target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}">経路を見る</a>
+    <div class="cmts"><small style="color:var(--sub)">コメントを読み込み中…</small></div>`;
   d.onclick = e => {
     const a = e.target.dataset.a; if (!a) return;
-    if (a === "toggle") { s.status = s.status==="want" ? "visited" : "want"; }
-    if (a === "del" && confirm("削除しますか?")) shops = shops.filter(x => x.id !== s.id);
+    if (a === "like") return toggleLike(s);
+    if (a === "cmtsend") return sendComment(s, d);
     if (a === "route") { map.closePopup(); startRoute(s); return; }
+    if (!isOwner) return;
+    if (a === "toggle") return updateShopStatus(s);
+    if (a === "del") { if (confirm("削除しますか?")) deleteShop(s.id); return; }
     if (a === "edit") { map.closePopup(); openDialog(s); return; }
-    persist(); render();
   };
+  loadComments(s.id, d);
   return d;
 }
 
@@ -217,12 +599,19 @@ $("photo").onchange = e => {
   img.src = URL.createObjectURL(f);
 };
 
-$("form").onsubmit = () => {
-  if (!pending?.lat) { alert("場所を検索するか、地図をクリックして選んでください"); return false; }
-  const data = { name:$("name").value.trim(), genre:$("genre").value, skin:$("skin").value, price:+$("price").value||0, rating:+$("rating").value, status:$("status").value, comment:$("comment").value.trim(), photo:photoData, lat:pending.lat, lng:pending.lng };
-  if (pending.id) shops = shops.map(s => s.id === pending.id ? { ...s, ...data } : s);
-  else shops.push({ id:Date.now(), ...data });
-  persist(); render(); pending = null;
+$("form").onsubmit = async ev => {
+  ev.preventDefault();
+  if (!requireAuth()) { $("dlg").close(); return; }
+  if (!pending?.lat) { alert("場所を検索するか、地図をクリックして選んでください"); return; }
+  const data = { name:$("name").value.trim(), genre:$("genre").value, skin:$("skin").value, price:+$("price").value||0, rating:+$("rating").value, status:$("status").value, comment:$("comment").value.trim(), photo:photoData, lat:pending.lat, lng:pending.lng, owner_id:session.user.id };
+  const res = pending.id
+    ? await sb.from('shops').update(data).eq('id', pending.id).eq('owner_id', session.user.id)
+    : await sb.from('shops').insert(data);
+  if (res.error) { alert("保存に失敗しました:" + res.error.message); return; }
+  $("dlg").close();
+  pending = null;
+  await loadCloud();
+  backfillAreas();
 };
 
 // ---- その他 ----
@@ -231,8 +620,18 @@ $("locate").onclick = () => navigator.geolocation?.getCurrentPosition(
   p => { map.setView([p.coords.latitude, p.coords.longitude], 15); L.circleMarker([p.coords.latitude, p.coords.longitude], { radius:8 }).addTo(map); },
   () => alert("現在地を取得できませんでした"));
 $("export").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(shops)], {type:"application/json"})); a.download = "shopmap.json"; a.click(); };
-$("import").onclick = () => $("file").click();
-$("file").onchange = async e => { try { const d = JSON.parse(await e.target.files[0].text()); if (Array.isArray(d)) { shops = d; persist(); render(); } } catch { alert("読み込めないファイルです"); } };
+$("import").onclick = () => { if (!requireAuth()) return; $("file").click(); };
+$("file").onchange = async e => {
+  if (!requireAuth()) return;
+  try {
+    const d = JSON.parse(await e.target.files[0].text()); if (!Array.isArray(d)) throw 0;
+    const rows = d.map(s => ({ name:s.name, genre:s.genre, rating:s.rating||5, status:s.status||"visited", skin:s.skin, price:s.price, comment:s.comment, lat:s.lat, lng:s.lng, photo:s.photo||null, owner_id:session.user.id }));
+    const { error } = await sb.from('shops').insert(rows); if (error) throw error;
+    await loadCloud(); backfillAreas();
+    toast(`${rows.length}件のお店を、自分の投稿として読み込みました`);
+  } catch { alert("読み込めないファイルです"); }
+  e.target.value = "";
+};
 
 // ===== 場所の検索(国土地理院の住所検索。キー不要) =====
 async function geoNominatim(q) {   // 駅名・施設名に強い
@@ -261,7 +660,7 @@ $("placebtn").onclick = async () => {
 };
 // 検索した場所に仮ピンを立て、ポップアップのボタンからそのまま登録できる
 let searchPin = null;
-function showSearchPin(g) {
+function showSearchPin(g, stay) {
   if (searchPin) map.removeLayer(searchPin);
   const icon = L.divIcon({ className:"", iconSize:[26,26], iconAnchor:[13,26], popupAnchor:[0,-24],
     html:'<div class="pin" style="background:#1a73e8"></div>' });
@@ -269,11 +668,13 @@ function showSearchPin(g) {
   box.innerHTML = `<b>${esc(g.name)}</b><div class="row"><button data-a="reg">＋ この場所を登録</button><button data-a="x" class="sub">消す</button></div>`;
   box.onclick = e => {
     const a = e.target.dataset.a; if (!a) return;
+    if (a === "reg" && !requireAuth()) return;
     map.removeLayer(searchPin); searchPin = null;
     if (a === "reg") { pending = { lat:g.lat, lng:g.lng }; openDialog(); $("name").value = g.short || ""; $("geores").textContent = "📍 " + g.name; }
   };
   searchPin = L.marker([g.lat, g.lng], { icon }).addTo(map).bindPopup(box);
-  map.setView([g.lat, g.lng], 16); searchPin.openPopup();
+  if (!stay) map.setView([g.lat, g.lng], 16);
+  searchPin.openPopup();
 }
 $("place").onkeydown = e => { if (e.key === "Enter") $("placebtn").click(); };
 $("geobtn").onclick = async () => {
@@ -360,7 +761,252 @@ map.on("click", e => {
   panel(`合計距離:<b>${fmtD(t)}</b>(徒歩で約${Math.max(1, Math.round(t/80))}分)`);
 });
 
-renderChips(); render();
+// ===== 各市区の主要駅データ(東京都・埼玉県・千葉県・神奈川県)[市区名, 駅名, 緯度, 経度] =====
+const STATIONS = [
+  ["さいたま市西区","指扇駅",35.91688,139.56541],
+  ["さいたま市北区","宮原駅",35.94026,139.60957],
+  ["さいたま市大宮区","大宮駅",35.90638,139.62433],
+  ["さいたま市見沼区","七里駅",35.93639,139.66582],
+  ["さいたま市中央区","与野本町駅",35.88121,139.62602],
+  ["さいたま市桜区","西浦和駅",35.84456,139.62767],
+  ["さいたま市南区","南浦和駅",35.84773,139.66914],
+  ["さいたま市緑区","浦和美園駅",35.89435,139.7271],
+  ["さいたま市岩槻区","岩槻駅",35.9501,139.69368],
+  ["川越市","本川越駅",35.91506,139.4821],
+  ["熊谷市","熊谷駅",36.14048,139.38922],
+  ["川口市","川口駅",35.80192,139.71753],
+  ["行田市","行田市駅",36.1436,139.45932],
+  ["秩父市","秩父駅",35.99863,139.08567],
+  ["所沢市","所沢駅",35.78679,139.47331],
+  ["飯能市","飯能駅",35.851,139.31906],
+  ["加須市","加須駅",36.12297,139.59571],
+  ["本庄市","本庄駅",36.23608,139.18863],
+  ["東松山市","東松山駅",36.03443,139.40195],
+  ["春日部市","春日部駅",35.98007,139.75208],
+  ["狭山市","狭山市駅",35.85729,139.4132],
+  ["羽生市","羽生駅",36.17045,139.53392],
+  ["鴻巣市","鴻巣駅",36.05926,139.50969],
+  ["深谷市","深谷駅",36.1918,139.28126],
+  ["上尾市","上尾駅",35.97333,139.58847],
+  ["草加市","草加駅",35.82652,139.80511],
+  ["越谷市","越谷駅",35.8883,139.78596],
+  ["蕨市","蕨駅",35.82813,139.69039],
+  ["戸田市","戸田駅",35.81778,139.6691],
+  ["入間市","入間市駅",35.84268,139.39013],
+  ["朝霞市","朝霞駅",35.79703,139.60022],
+  ["和光市","和光市駅",35.78841,139.61267],
+  ["新座市","新座駅",35.80377,139.55622],
+  ["桶川市","桶川駅",35.99874,139.56402],
+  ["久喜市","久喜駅",36.06561,139.67752],
+  ["北本市","北本駅",36.03164,139.53398],
+  ["八潮市","八潮駅",35.80783,139.84487],
+  ["富士見市","みずほ台駅",35.83822,139.55086],
+  ["三郷市","三郷駅",35.84463,139.88572],
+  ["蓮田市","蓮田駅",35.98156,139.65286],
+  ["坂戸市","坂戸駅",35.95745,139.39327],
+  ["幸手市","幸手駅",36.07503,139.71577],
+  ["日高市","武蔵高萩駅",35.90175,139.37135],
+  ["吉川市","吉川駅",35.87735,139.84225],
+  ["ふじみ野市","上福岡駅",35.8739,139.5118],
+  ["白岡市","白岡駅",36.01784,139.66643],
+  ["千葉市中央区","千葉駅",35.61331,140.11463],
+  ["千葉市花見川区","新検見川駅",35.6518,140.07296],
+  ["千葉市稲毛区","稲毛駅",35.63699,140.09268],
+  ["千葉市若葉区","都賀駅",35.63609,140.14922],
+  ["千葉市緑区","鎌取駅",35.56321,140.1787],
+  ["千葉市美浜区","海浜幕張駅",35.64856,140.04169],
+  ["銚子市","銚子駅",35.72983,140.82722],
+  ["市川市","本八幡駅",35.72297,139.92653],
+  ["船橋市","船橋駅",35.70173,139.98497],
+  ["館山市","館山駅",34.99652,139.86241],
+  ["木更津市","木更津駅",35.38161,139.92624],
+  ["松戸市","松戸駅",35.78441,139.89997],
+  ["野田市","野田市駅",35.94357,139.87065],
+  ["成田市","成田駅",35.77784,140.31408],
+  ["佐倉市","佐倉駅",35.70942,140.22601],
+  ["東金市","東金駅",35.56069,140.36401],
+  ["旭市","旭駅",35.72187,140.65512],
+  ["習志野市","京成大久保駅",35.68588,140.04848],
+  ["勝浦市","勝浦駅",35.15221,140.31193],
+  ["市原市","五井駅",35.51305,140.0897],
+  ["流山市","流山おおたかの森駅",35.87203,139.92589],
+  ["八千代市","八千代中央駅",35.72785,140.10341],
+  ["我孫子市","我孫子駅",35.87277,140.0108],
+  ["鎌ケ谷市","鎌ケ谷駅",35.76405,139.99735],
+  ["君津市","君津駅",35.33363,139.89551],
+  ["浦安市","新浦安駅",35.64973,139.91398],
+  ["四街道市","四街道駅",35.66303,140.1656],
+  ["袖ケ浦市","袖ケ浦駅",35.43649,139.95404],
+  ["八街市","八街駅",35.66305,140.31765],
+  ["白井市","白井駅",35.78508,140.05571],
+  ["南房総市","千倉駅",34.97672,139.95468],
+  ["匝瑳市","八日市場駅",35.69917,140.55203],
+  ["香取市","佐原駅",35.89453,140.49405],
+  ["山武市","成東駅",35.60838,140.4108],
+  ["大網白里市","大網駅",35.52278,140.31154],
+  ["千代田区","秋葉原駅",35.69716,139.77516],
+  ["中央区","銀座駅",35.67119,139.76541],
+  ["港区","新橋駅",35.66739,139.75935],
+  ["新宿区","新宿駅",35.68749,139.69675],
+  ["文京区","後楽園駅",35.70682,139.75208],
+  ["台東区","上野駅",35.71404,139.77712],
+  ["墨田区","錦糸町駅",35.69631,139.81504],
+  ["江東区","豊洲駅",35.65506,139.79665],
+  ["品川区","大井町駅",35.60745,139.73441],
+  ["目黒区","中目黒駅",35.64434,139.69905],
+  ["大田区","蒲田駅",35.56243,139.71666],
+  ["世田谷区","下北沢駅",35.66127,139.66692],
+  ["渋谷区","渋谷駅",35.65901,139.7025],
+  ["中野区","中野駅",35.70578,139.66579],
+  ["杉並区","荻窪駅",35.70416,139.619],
+  ["豊島区","池袋駅",35.72805,139.71329],
+  ["北区","赤羽駅",35.77893,139.72025],
+  ["荒川区","日暮里駅",35.72801,139.77138],
+  ["板橋区","成増駅",35.777589999999996,139.63293],
+  ["練馬区","練馬駅",35.73605,139.65225],
+  ["足立区","北千住駅",35.75,139.80464],
+  ["葛飾区","金町駅",35.76958,139.87069],
+  ["江戸川区","船堀駅",35.68446,139.86404],
+  ["八王子市","八王子駅",35.65539,139.33947],
+  ["立川市","立川駅",35.69613,139.41533],
+  ["武蔵野市","吉祥寺駅",35.7021,139.5804],
+  ["三鷹市","三鷹駅",35.70215,139.5612],
+  ["青梅市","青梅駅",35.79,139.2587],
+  ["府中市","府中駅",35.67234,139.48024],
+  ["昭島市","昭島駅",35.71357,139.36089],
+  ["調布市","調布駅",35.65198,139.54377],
+  ["町田市","町田駅",35.54567,139.44548],
+  ["小金井市","武蔵小金井駅",35.70111,139.50679],
+  ["小平市","小平駅",35.73679,139.48842],
+  ["日野市","豊田駅",35.65951,139.38148],
+  ["東村山市","東村山駅",35.75989,139.46595],
+  ["国分寺市","国分寺駅",35.70024,139.48031],
+  ["国立市","国立駅",35.69844,139.44707],
+  ["福生市","福生駅",35.74201,139.32766],
+  ["狛江市","狛江駅",35.63232,139.57742],
+  ["東大和市","東大和市駅",35.73289,139.43452],
+  ["清瀬市","清瀬駅",35.77208,139.51982],
+  ["東久留米市","東久留米駅",35.76025,139.53409],
+  ["多摩市","多摩センター駅",35.62404,139.42291],
+  ["稲城市","稲城駅",35.63613,139.49957],
+  ["羽村市","羽村駅",35.75835,139.31601],
+  ["あきる野市","武蔵五日市駅",35.73235,139.22816],
+  ["西東京市","ひばりヶ丘駅",35.75137,139.54506],
+  ["横浜市神奈川区","反町駅",35.47468,139.62525],
+  ["横浜市西区","横浜駅",35.46601,139.62264],
+  ["横浜市中区","関内駅",35.44607,139.63577],
+  ["横浜市南区","弘明寺駅",35.42435,139.59679],
+  ["横浜市保土ケ谷区","保土ケ谷駅",35.44668,139.59972],
+  ["横浜市磯子区","磯子駅",35.39996,139.61742],
+  ["横浜市金沢区","金沢文庫駅",35.34347,139.62196],
+  ["横浜市港北区","菊名駅",35.50969,139.63027],
+  ["横浜市戸塚区","戸塚駅",35.40074,139.5345],
+  ["横浜市港南区","上大岡駅",35.40902,139.59599],
+  ["横浜市旭区","二俣川駅",35.46347,139.53224],
+  ["横浜市緑区","中山駅",35.5143,139.5399],
+  ["横浜市瀬谷区","瀬谷駅",35.4716,139.48287],
+  ["横浜市栄区","本郷台駅",35.36792,139.55019],
+  ["横浜市泉区","いずみ中央駅",35.4165,139.48724],
+  ["横浜市青葉区","あざみ野駅",35.56868,139.55344],
+  ["横浜市都筑区","センター南駅",35.54543,139.57438],
+  ["川崎市川崎区","川崎駅",35.53024,139.69812],
+  ["川崎市幸区","尻手駅",35.53107,139.68427],
+  ["川崎市中原区","武蔵小杉駅",35.57592,139.66352],
+  ["川崎市高津区","溝口駅",35.59993,139.61051],
+  ["川崎市多摩区","登戸駅",35.62111,139.56955],
+  ["川崎市宮前区","鷺沼駅",35.5792,139.57341],
+  ["川崎市麻生区","新百合ヶ丘駅",35.60318,139.50781],
+  ["相模原市緑区","橋本駅",35.59364,139.31723],
+  ["相模原市中央区","相模原駅",35.58146,139.37074],
+  ["相模原市南区","相模大野駅",35.53217,139.43789],
+  ["横須賀市","横須賀駅",35.28413,139.65613],
+  ["平塚市","平塚駅",35.32741,139.34923],
+  ["鎌倉市","鎌倉駅",35.319,139.55068],
+  ["藤沢市","藤沢駅",35.33843,139.48757],
+  ["小田原市","小田原駅",35.25575,139.15666],
+  ["逗子市","逗子駅",35.29757,139.5797],
+  ["三浦市","三崎口駅",35.17705,139.63353],
+  ["秦野市","秦野駅",35.37022,139.2265],
+  ["厚木市","本厚木駅",35.43932,139.36428],
+  ["大和市","大和駅",35.46959,139.46118],
+  ["伊勢原市","伊勢原駅",35.39599,139.3135],
+  ["海老名市","海老名駅",35.45239,139.39174],
+  ["座間市","相武台前駅",35.49923,139.40768],
+  ["南足柄市","大雄山駅",35.31976,139.10329]
+];
+
+// ===== 各市区の主要駅(目印ピン)=====
+// 東京都・埼玉県・千葉県・神奈川県の市・区ごとに1駅。データは STATIONS(下)に内蔵。選んだときだけ描く
+const stnLayer = L.layerGroup();
+let stnBuilt = false;
+const buildStations = () => {
+  if (stnBuilt) return; stnBuilt = true;
+  STATIONS.forEach(([muni, name, lat, lng]) => {
+    L.marker([lat, lng], { icon:L.divIcon({ className:"", html:'<div class="stn"></div>', iconSize:[14,14], iconAnchor:[7,7] }), keyboard:false, zIndexOffset:-500 })
+      .bindTooltip(name, { permanent:true, direction:"right", offset:[8,0], className:"stn-label" })
+      .bindPopup(`<b>${esc(name)}</b><br><span style="color:#5f6368;font-size:13px">${esc(muni)}の主要駅</span>`)
+      .addTo(stnLayer);
+  });
+};
+const stnLabels = () => {   // 引いた画面では駅名を隠して軽くする
+  const show = map.getZoom() >= 11;
+  stnLayer.eachLayer(m => m.getTooltip() && (show ? m.openTooltip() : m.closeTooltip()));
+};
+map.on("zoomend", () => map.hasLayer(stnLayer) && stnLabels());
+$("stnBtn").onclick = () => {
+  if (map.hasLayer(stnLayer)) { map.removeLayer(stnLayer); $("stnBtn").classList.remove("on"); }
+  else { buildStations(); map.addLayer(stnLayer); stnLabels(); $("stnBtn").classList.add("on"); }
+  try { localStorage.setItem("shopmap.stn", map.hasLayer(stnLayer) ? "1" : "0"); } catch {}
+};
+try { if (localStorage.getItem("shopmap.stn") === "1") $("stnBtn").click(); } catch {}
+
+// ===== 境界線の切替ボタン =====
+document.querySelectorAll("[data-line]").forEach(b => b.onclick = () => {
+  const l = b.dataset.line === "pref" ? prefLayer : cityLayer;
+  map.hasLayer(l) ? map.removeLayer(l) : map.addLayer(l);
+});
+syncLines();
+
+// ===== メニュー(左パネル/下シート) =====
+const drawer = $("drawer"), closeDrawer = () => drawer.classList.remove("open");
+$("menu").onclick = () => drawer.classList.toggle("open");
+$("close").onclick = closeDrawer;
+// ===== お店の追加(3つの入り口 + 長押し) =====
+const addmenu = $("addmenu"), closeAdd = () => addmenu.classList.remove("open");
+const startPick = () => { pending = null; picking = true; $("hint").style.display = "block"; };
+const stopPick = () => { picking = false; $("hint").style.display = "none"; };
+$("add").onclick = e => { e.stopPropagation(); if (!requireAuth()) return; if (innerWidth <= 700) closeDrawer(); stopPick(); addmenu.classList.toggle("open"); };
+document.addEventListener("click", e => { if (!addmenu.contains(e.target)) closeAdd(); });
+$("addMap").onclick = () => { closeAdd(); startPick(); };
+$("hintx").onclick = stopPick;
+document.addEventListener("keydown", e => { if (e.key === "Escape") { stopPick(); closeAdd(); } });
+$("addSearch").onclick = () => { closeAdd(); $("place").focus(); $("place").placeholder = "例: 浅草駅 / 東京都台東区…"; };
+$("addHere").onclick = () => {
+  closeAdd();
+  if (!navigator.geolocation) return alert("この端末では位置情報が使えません");
+  navigator.geolocation.getCurrentPosition(
+    p => { pending = { lat:p.coords.latitude, lng:p.coords.longitude }; openDialog(); $("geores").textContent = "📍 いまいる場所"; map.setView([pending.lat, pending.lng], 17); },
+    () => alert("現在地を取得できませんでした。位置情報の許可を確認してください"), { enableHighAccuracy:true });
+};
+// 地図の長押し(PCは右クリック)でも、その場所に仮ピンを立てて登録できる
+map.on("contextmenu", e => showSearchPin({ lat:e.latlng.lat, lng:e.latlng.lng, name:"選んだ場所", short:"" }, true));
+$("place").addEventListener("focus", () => { if (innerWidth <= 700) closeDrawer(); });
+
+// ===== 起動処理: ログイン状態の確認 → 共有データの読み込み =====
+sb.auth.onAuthStateChange((event, s) => {
+  session = s;
+  if (event === "SIGNED_IN") { history.replaceState(null, "", location.pathname + location.search); ensureProfile(); }
+  if (event === "SIGNED_OUT") myProfile = null;
+  updateAuthUI();
+});
+(async () => {
+  const { data:{ session:s0 } } = await sb.auth.getSession();
+  session = s0;
+  if (session) await ensureProfile();
+  renderChips();
+  await loadCloud();
+  backfillAreas();
+})();
 </script>
 </body>
 </html>
