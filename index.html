@@ -78,10 +78,7 @@
   /* 地図の色と混ざって見えにくくならないよう、白い縁取り(ハロー)を太めに重ねて浮き上がらせる */
   .taiyaki-pin svg { position:absolute; top:0; left:0; width:96px; height:59px;   /* 画面全体の「svgは24px」設定より優先 */
     filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 2px #fff) drop-shadow(0 0 2.5px #fff) drop-shadow(0 2px 3px #0009); }
-  /* 「行った/食べたい」は、ピンの形は変えず、右上の小さなバッジで見分ける */
-  .taiyaki-pin .badge { position:absolute; z-index:2; top:-9px; right:-9px; width:24px; height:24px; border-radius:50%; display:grid; place-items:center; font-size:14px; font-weight:700; color:#fff; border:2.5px solid #fff; box-shadow:0 1px 3px #0007; }
-  .taiyaki-pin.visited .badge { background:#2e7d32; }
-  .taiyaki-pin.want .badge { background:#1a73e8; }
+  /* 「行った/食べたい」は、ピン中央のバッジ(丸/星)だけで見分ける */
   .taiyaki-pin.want svg .outline { stroke-dasharray:4 3; }
   .leaflet-popup-content-wrapper { border-radius:12px; box-shadow:var(--shadow); }
   .leaflet-popup-content { font-family:inherit; margin:12px 14px; }
@@ -526,7 +523,7 @@ function render(){
   shown.forEach(s => {
     const c = GENRES[(s.genres && s.genres[0])] || GENRES["その他"];
     const icon = L.divIcon({ className:"", iconSize:[96,59], iconAnchor:[22,54], popupAnchor:[0,-52],
-      html:`<div class="taiyaki-pin ${s.status}">${taiyakiSvg(c, s.status)}<div class="badge" title="${s.status==="want"?"食べたい":"食べた"}">${s.status==="want"?"★":"✓"}</div></div>` });
+      html:`<div class="taiyaki-pin ${s.status}">${taiyakiSvg(c, s.status)}</div>` });
     const m = L.marker([s.lat, s.lng], { icon }).addTo(layer).bindPopup(() => popupHtml(s));
     markers[s.id] = m;
     const owner = profilesById[s.ownerId] || {};
