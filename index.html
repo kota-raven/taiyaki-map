@@ -122,6 +122,54 @@
   #toast.show { opacity:1; transform:translate(-50%,0); }
   #hint { top:118px; }
   }
+
+  /* ===== ポップなデザイン(色・縁取り・丸みを上書き。ピンの形はそのまま) ===== */
+  :root { --ink:#2b2d42; --sub:#6b6f85; --accent:#d6420f; --accent-bg:#fff0e0; --line:#ffd9b0; --sun:#ffd54a; --pop:#ff8a3d; --cream:#fffdf5; --shadow:0 3px 0 #0002, 0 6px 14px #2b2d4222; }
+  button { border:2px solid var(--ink); border-radius:999px; font-weight:700; box-shadow:0 3px 0 #0003; transition:transform .12s, box-shadow .12s; }
+  button:hover { filter:none; transform:translateY(-1px); }
+  button:active { transform:translateY(2px); box-shadow:0 1px 0 #0003; }
+  button.sub { background:#fff; color:var(--accent); border:2px solid var(--accent); }
+  button.on { background:var(--sun); color:var(--ink); border-color:var(--ink); }
+  button.icon { border:0; box-shadow:none; color:var(--ink); }
+  button.icon:hover { background:var(--accent-bg); transform:none; }
+  button.icon:active { transform:none; }
+  #topbar { background:var(--cream); border:2.5px solid var(--ink); box-shadow:0 4px 0 var(--ink); }
+  #placebtn { color:var(--accent); }
+  .chip { border:2px solid var(--ink); box-shadow:0 3px 0 var(--ink); padding:7px 14px; min-height:38px; font-weight:700; color:var(--ink); background:#fff; }
+  .chip::before { width:12px; height:12px; border:2px solid var(--ink); }
+  .chip.on, .chip:hover, .chip.on:hover { background:var(--sun); color:var(--ink); border-color:var(--ink); }
+  .fab { border:2.5px solid var(--ink); box-shadow:0 4px 0 var(--ink); color:var(--ink); background:#fff; }
+  .fab:hover { background:var(--accent-bg); }
+  .fab.primary, .fab.primary:hover { background:var(--pop); color:var(--ink); font-weight:800; }
+  #addmenu button { border:2.5px solid var(--ink); box-shadow:0 3px 0 var(--ink); background:#fff; font-weight:700; }
+  #addmenu button:hover { background:var(--sun); }
+  #hint { background:var(--ink); border:2px solid var(--sun); border-radius:999px; font-weight:700; }
+  #toast { background:var(--ink); border:2px solid var(--sun); border-radius:999px; font-weight:700; }
+  #drawer { border-right:2.5px solid var(--ink); background:var(--cream); }
+  .dh { background:linear-gradient(135deg,var(--sun),var(--pop)); border-bottom:2.5px solid var(--ink); color:var(--ink); font-weight:800; }
+  .dq input { border:2px solid var(--ink); background:#fff; }
+  .acts { border-bottom:2px dashed var(--line); }
+  .acts button { min-height:40px; padding:8px 14px; font-size:14px; }
+  .item { padding:14px 16px; border-bottom:2px dashed #ffe9cf; }
+  .item:hover { background:#fff3d9; }
+  .item b { font-weight:800; }
+  .genre-opt { border:2px solid var(--ink); font-weight:700; padding:8px 14px; font-size:14px; box-shadow:0 2px 0 var(--ink); }
+  .genre-opt.on { border-color:var(--ink); }
+  .leaflet-popup-content-wrapper { background:var(--cream); border:2.5px solid var(--ink); border-radius:20px; box-shadow:0 4px 0 var(--ink); }
+  .leaflet-popup-tip { background:var(--cream); }
+  .popup b { font-size:17px; font-weight:800; }
+  .marker-cluster-small, .marker-cluster-medium, .marker-cluster-large { background:rgba(255,138,61,.35); }
+  .marker-cluster-small div, .marker-cluster-medium div, .marker-cluster-large div { background:var(--pop); color:var(--ink); border:2.5px solid var(--ink); font:800 13px/25px inherit; font-family:inherit; }
+  .pref-bubble { background:var(--pop); color:var(--ink); border:2.5px solid var(--ink); box-shadow:0 3px 0 var(--ink); }
+  dialog { background:var(--cream); border:3px solid var(--ink); border-radius:24px; box-shadow:0 8px 0 var(--ink); }
+  dialog::backdrop { background:#2b2d4266; }
+  dialog h3 { font-weight:800; }
+  dialog label { color:var(--ink); font-weight:700; }
+  dialog input, dialog select, dialog textarea { border:2px solid var(--ink); border-radius:14px; background:#fff; }
+  .dactions { position:sticky; bottom:-22px; margin:14px -22px -22px; padding:12px 22px; background:var(--cream); border-top:2px dashed var(--line); display:flex; gap:8px; justify-content:flex-end; }
+  @media (max-width:700px) {
+    #drawer { border:2.5px solid var(--ink); border-bottom:0; border-radius:24px 24px 0 0; }
+  }
 </style>
 </head>
 <body>
@@ -210,7 +258,7 @@
     <select id="status"><option value="visited">食べた</option><option value="want">食べたい</option></select>
     <label>ひとこと</label><textarea id="comment" rows="3" maxlength="200"></textarea>
     <label>写真</label><input id="photo" type="file" accept="image/*">
-    <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+    <div class="dactions">
       <button type="button" class="sub" id="cancel">キャンセル</button>
       <button type="submit" id="save">保存</button>
     </div>
@@ -365,10 +413,17 @@ const syncZoomMode = () => {
 };
 map.on("zoomend", syncZoomMode);
 function showShop(s) {   // 店の位置へ寄って、ポップアップを開く(広域・まとまりの中にあっても開く)
-  map.setView([s.lat, s.lng], Math.max(map.getZoom(), 15), { animate:false });
-  syncZoomMode();
-  const m = markers[s.id], g = prefGroups[prefOf(s)];
-  if (m && g) g.zoomToShowLayer(m, () => m.openPopup());
+  let z = Math.max(map.getZoom(), 15);
+  const place = () => { map.setView([s.lat, s.lng], z, { animate:false }); syncZoomMode(); };
+  place();
+  const m = markers[s.id]; if (!m) return;
+  let tries = 0;   // ピンが地図に出るまで待つ。まとまりに残っているときは、1段ずつ寄る(最大ズーム18)
+  const tick = () => {
+    if (m._map) return m.openPopup();
+    if (++tries % 8 === 0 && z < 18) { z++; place(); }
+    if (tries < 40) setTimeout(tick, 100);
+  };
+  tick();
 }
 let userPos = null, sortNear = false;
 // 所在地: 国土地理院の逆ジオコーダ(座標→市町村コード)+ 市町村名の表
@@ -507,7 +562,8 @@ function renderRanking() {
   const box = $("rankBox"); if (!box || box.style.display === "none") return;
   const byId = Object.fromEntries(shops.map(s => [s.id, s]));
   const likeRank = Object.entries(likesByShop).map(([id, set]) => ({ id:+id, n:set.size })).filter(x => byId[x.id]).sort((a, b) => b.n - a.n).slice(0, 5);
-  const postCounts = {}; shops.forEach(s => postCounts[s.ownerId] = (postCounts[s.ownerId] || 0) + 1);
+  const OFFICIAL_ID = "cb44ad67-7ac5-440a-8c4e-61f921f1f889";   // 運営アカウントは、利用者の投稿数ランキングに入れない
+  const postCounts = {}; shops.forEach(s => { if (s.ownerId !== OFFICIAL_ID) postCounts[s.ownerId] = (postCounts[s.ownerId] || 0) + 1; });
   const postRank = Object.entries(postCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
   box.innerHTML = `
     <h4 style="margin:14px 16px 4px;font-size:14px;font-weight:500">🏆 人気ランキング</h4>
@@ -632,6 +688,7 @@ function openDialog(s){
   $("comment").value = s?.comment || ""; $("photo").value = ""; $("geo").value = ""; $("geores").textContent = "";
   photoData = s?.photo || "";
   $("dlg").showModal();
+  if (matchMedia("(max-width:700px)").matches) document.activeElement?.blur();   // スマホでは、開いた瞬間にキーボードが出ないようにする
 }
 $("add").onclick = () => { pending = null; picking = true; $("hint").style.display = "block"; };
 map.on("click", e => { if (!picking) return; picking = false; $("hint").style.display = "none"; pending = { lat:e.latlng.lat, lng:e.latlng.lng }; openDialog(); });
