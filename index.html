@@ -87,6 +87,9 @@
   .popup .row { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 6px; }
   .popup .row button { padding:6px 12px; border-radius:16px; font-size:13px; }
   .popup a { color:var(--accent); text-decoration:none; font-size:13px; }
+  .pref-bubble { width:50px; height:50px; border-radius:50%; background:#c9781a; color:#fff; border:2.5px solid #fff; box-shadow:0 2px 6px #0007; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.1; cursor:pointer; }
+  .pref-bubble b { font-size:16px; font-weight:700; }
+  .pref-bubble span { font-size:9px; white-space:nowrap; }
   .me { width:16px; height:16px; background:#1a73e8; border:3px solid #fff; border-radius:50%; box-shadow:0 0 0 6px #1a73e833; }
 
   /* ルート・距離のパネル */
@@ -348,7 +351,25 @@ let toastT = null;
 const toast = msg => { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 4500); };
 map.on("overlayadd", e => { if (e.layer === prefLayer || e.layer === cityLayer) toast("ℹ️ 境界線を表示すると、地図が少し重くなることがあります。重いときはオフにしてください。"); });
 L.control.scale({ imperial:false }).addTo(map);
-const layer = L.markerClusterGroup({ maxClusterRadius:70 }).addTo(map);
+// ピンのまとまりは「県ごと」に別々の集まりにする。引いても、県をまたいで1つにまとまらない(最大でも1県分)
+const layer = L.layerGroup().addTo(map);
+let prefGroups = {};
+const prefOf = s => (s.area || "").split(" ")[0] || "その他";
+const prefGroup = p => prefGroups[p] ||= L.markerClusterGroup({ maxClusterRadius:70, showCoverageOnHover:false }).addTo(layer);
+// ズーム8以下(広域)では、ピンの代わりに「県名+件数」の丸だけを出す。近づく(ズーム9以上)と県ごとのまとまりに切り替わる
+const PREF_ZOOM = 8;
+const bubbleLayer = L.layerGroup();
+const syncZoomMode = () => {
+  if (map.getZoom() <= PREF_ZOOM) { map.removeLayer(layer); bubbleLayer.addTo(map); }
+  else { map.removeLayer(bubbleLayer); layer.addTo(map); }
+};
+map.on("zoomend", syncZoomMode);
+function showShop(s) {   // 店の位置へ寄って、ポップアップを開く(広域・まとまりの中にあっても開く)
+  map.setView([s.lat, s.lng], Math.max(map.getZoom(), 15), { animate:false });
+  syncZoomMode();
+  const m = markers[s.id], g = prefGroups[prefOf(s)];
+  if (m && g) g.zoomToShowLayer(m, () => m.openPopup());
+}
 let userPos = null, sortNear = false;
 // 所在地: 国土地理院の逆ジオコーダ(座標→市町村コード)+ 市町村名の表
 let muniP = null;
@@ -496,7 +517,7 @@ function renderRanking() {
   box.querySelectorAll("[data-goto]").forEach(el => el.onclick = () => {
     const s = byId[+el.dataset.goto]; if (!s) return;
     if (innerWidth <= 700) closeDrawer();
-    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 15)); markers[s.id]?.openPopup();
+    showShop(s);
   });
 }
 $("rankBtn").onclick = () => { const box = $("rankBox"); box.style.display = box.style.display === "none" ? "block" : "none"; $("rankBtn").classList.toggle("on"); renderRanking(); };
@@ -516,7 +537,8 @@ function visible(s){
 }
 
 function render(){
-  layer.clearLayers();
+  layer.clearLayers(); prefGroups = {}; bubbleLayer.clearLayers();
+  const prefStat = {};
   const list = $("list"); list.innerHTML = "";
   const shown = shops.filter(visible);
   if (sortNear && userPos) shown.sort((a, b) => dist(userPos, a) - dist(userPos, b));
@@ -524,17 +546,24 @@ function render(){
     const c = GENRES[(s.genres && s.genres[0])] || GENRES["その他"];
     const icon = L.divIcon({ className:"", iconSize:[96,59], iconAnchor:[22,54], popupAnchor:[0,-52],
       html:`<div class="taiyaki-pin ${s.status}">${taiyakiSvg(c, s.status)}</div>` });
-    const m = L.marker([s.lat, s.lng], { icon }).addTo(layer).bindPopup(() => popupHtml(s));
+    const m = L.marker([s.lat, s.lng], { icon }).addTo(prefGroup(prefOf(s))).bindPopup(() => popupHtml(s));
+    (prefStat[prefOf(s)] ||= []).push([s.lat, s.lng]);
     markers[s.id] = m;
     const owner = profilesById[s.ownerId] || {};
     const likeN = (likesByShop[s.id] || new Set()).size, cmtN = commentCountByShop[s.id] || 0;
     const el = document.createElement("div");
     el.className = "item";
     el.innerHTML = `${s.photo?`<img src="${s.photo}">`:""}<div><b>${esc(s.name)}</b><small>${owner.nickname?`${owner.avatar||"🐟"} ${esc(owner.nickname)}・`:""}${s.area?`📍 ${esc(s.area)}<br>`:"<br>"}${genreLabel(s)} ${s.skin||""} ${s.price?s.price+"円":""} ${"★".repeat(s.rating)} ${s.status==="want"?"・食べたい":""}${likeN?` ・❤${likeN}`:""}${cmtN?` ・💬${cmtN}`:""}${userPos?`<span class="dist">${fmtD(dist(userPos, s))}</span>`:""}</small></div>`;
-    el.onclick = () => { if (innerWidth <= 700) closeDrawer(); map.setView([s.lat, s.lng], Math.max(map.getZoom(), 15)); m.openPopup(); };
+    el.onclick = () => { if (innerWidth <= 700) closeDrawer(); showShop(s); };
     list.appendChild(el);
   });
   if (!list.children.length) list.innerHTML = `<div class="item">まだ投稿がありません。最初のたい焼き店を追加してみましょう!</div>`;
+  for (const [p, pts] of Object.entries(prefStat)) {
+    const c = [pts.reduce((a, q) => a + q[0], 0) / pts.length, pts.reduce((a, q) => a + q[1], 0) / pts.length];
+    L.marker(c, { zIndexOffset: pts.length * 10, icon: L.divIcon({ className:"", iconSize:[50,50], html:`<div class="pref-bubble"><b>${pts.length}</b><span>${esc(p)}</span></div>` }) })
+      .on("click", () => map.fitBounds(L.latLngBounds(pts), { maxZoom:12, padding:[60,60] })).addTo(bubbleLayer);
+  }
+  syncZoomMode();
   updateAuthUI();
   renderRanking();
 }
